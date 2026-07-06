@@ -30,3 +30,20 @@ export async function createCategory(data: { name: string }) {
   revalidatePath("/categories");
   return category;
 }
+
+export async function renameCategory(data: { id: string; name: string }) {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const name = data.name.trim();
+  if (!name) throw new Error("Category name is required");
+
+  const category = await prisma.category.update({
+    where: { id: data.id, userId: session.user.id },
+    data: { name },
+    select: { id: true, name: true },
+  });
+
+  revalidatePath("/categories");
+  return category;
+}

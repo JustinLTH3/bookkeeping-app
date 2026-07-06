@@ -4,9 +4,10 @@ const ITEMS_PER_PAGE = 10;
 
 type Props = {
   categories: Category[];
+  onEdit: (category: Category) => void;
 };
 
-export function CategoryTable({ categories }: Props) {
+export function CategoryTable({ categories, onEdit }: Props) {
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - categories.length);
 
   return (
@@ -31,6 +32,7 @@ export function CategoryTable({ categories }: Props) {
               <td className="px-6 py-4 text-right text-sm whitespace-nowrap">
                 <button
                   type="button"
+                  onClick={() => onEdit(category)}
                   className="rounded-md px-3 py-1.5 font-medium text-secondary hover:bg-secondary/10"
                 >
                   Edit

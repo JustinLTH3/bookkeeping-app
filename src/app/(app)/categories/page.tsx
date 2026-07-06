@@ -4,7 +4,11 @@ import { useState, useMemo, useEffect } from "react";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
-import { getCategories, createCategory } from "@/actions/categories";
+import {
+  getCategories,
+  createCategory,
+  renameCategory,
+} from "@/actions/categories";
 
 export type Category = {
   id: string;
@@ -17,6 +21,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
@@ -32,10 +37,23 @@ export default function CategoriesPage() {
     return categories.slice(start, start + ITEMS_PER_PAGE);
   }, [categories, currentPage]);
 
-  function handleOpenModal() {
+  function handleOpenAddModal() {
+    setEditingCategory(null);
     setName("");
     setError("");
     setIsModalOpen(true);
+  }
+
+  function handleOpenEditModal(category: Category) {
+    setEditingCategory(category);
+    setName(category.name);
+    setError("");
+    setIsModalOpen(true);
+  }
+
+  function handleCloseModal() {
+    setEditingCategory(null);
+    setIsModalOpen(false);
   }
 
   async function handleSave() {
@@ -47,9 +65,19 @@ export default function CategoriesPage() {
 
     setIsSaving(true);
     try {
-      const category = await createCategory({ name: name.trim() });
-      setCategories((prev) => [category, ...prev]);
-      setIsModalOpen(false);
+      if (editingCategory) {
+        const updated = await renameCategory({
+          id: editingCategory.id,
+          name: name.trim(),
+        });
+        setCategories((prev) =>
+          prev.map((c) => (c.id === updated.id ? updated : c)),
+        );
+      } else {
+        const category = await createCategory({ name: name.trim() });
+        setCategories((prev) => [category, ...prev]);
+      }
+      handleCloseModal();
     } catch {
       setError("Failed to save category");
     } finally {
@@ -65,7 +93,7 @@ export default function CategoriesPage() {
         </h1>
         <button
           type="button"
-          onClick={handleOpenModal}
+          onClick={handleOpenAddModal}
           className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
         >
           Add Category
@@ -73,7 +101,10 @@ export default function CategoriesPage() {
       </div>
 
       <div className="mt-8">
-        <CategoryTable categories={paginatedCategories} />
+        <CategoryTable
+          categories={paginatedCategories}
+          onEdit={handleOpenEditModal}
+        />
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
@@ -83,8 +114,8 @@ export default function CategoriesPage() {
 
       <Modal
         open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Add Category"
+        onClose={handleCloseModal}
+        title={editingCategory ? "Edit Category" : "Add Category"}
       >
         <div className="space-y-4">
           <div>
@@ -103,14 +134,12 @@ export default function CategoriesPage() {
               placeholder="Category name"
               autoFocus
             />
-            {error && (
-              <p className="mt-1 text-sm text-red-600">{error}</p>
-            )}
+            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
           </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setIsModalOpen(false)}
+              onClick={handleCloseModal}
               disabled={isSaving}
               className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral disabled:opacity-50"
             >
