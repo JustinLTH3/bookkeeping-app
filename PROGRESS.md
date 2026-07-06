@@ -5,6 +5,7 @@
 | Feature                   | Details                                                                                                                                                      |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Prisma Schema             | All 6 models (User, Account, Session, VerificationToken, Category, Transaction) with all columns, constraints, indexes, enums, and relationships per PLAN.md |
+| Remove type columns       | Removed `TransactionType` enum and `type` column from Category and Transaction models; polarity determined by sign of `amount`                               |
 | Database Migration        | Initial migration applied (`prisma/migrations/20260702151201_init/`)                                                                                         |
 | Auth.js v5 + Google OAuth | Config in `src/lib/auth.ts` with `@auth/prisma-adapter` and `PrismaPg` PostgreSQL adapter                                                                    |
 | Auth API Route            | `src/app/api/auth/[...nextauth]/route.ts` exports GET/POST                                                                                                   |
@@ -21,10 +22,10 @@
 
 ## In Progress
 
-| Feature         | Details                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Categories Page | `src/app/(app)/categories/` — empty initial state, `max-w-5xl` wrapper, pagination (10/page), Edit/Delete buttons |
-| CategoryTable   | `src/components/categories/CategoryTable.tsx` — fixed row count, Name/Type/Actions columns, badges                |
+| Feature         | Details                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Categories Page | `src/app/(app)/categories/` — fetches from DB, server actions, add category via modal, pagination (10/page), Edit/Delete stubs |
+| CategoryTable   | `src/components/categories/CategoryTable.tsx` — fixed row count, Name + Actions columns, no type column                     |
 
 ## Not Started
 
@@ -38,4 +39,3 @@
 | Integration Tests      | No test DB setup, no seeded data, no test files                                                    |
 | E2E Tests (Playwright) | Not installed, no config, no test files                                                            |
 | Lib Utilities          | No formatting, validation, or helper utilities                                                     |
-| Remove type columns    | Remove `type` enum from Category and Transaction models; polarity determined by sign of `amount`    |

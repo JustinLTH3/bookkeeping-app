@@ -1,23 +1,29 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
+import { getCategories, createCategory } from "@/actions/categories";
 
 export type Category = {
   id: string;
   name: string;
-  type: "INCOME" | "EXPENSE";
 };
 
 const ITEMS_PER_PAGE = 10;
 
 export default function CategoriesPage() {
-  const [categories] = useState<Category[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getCategories().then(setCategories);
+  }, []);
 
   const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
 
@@ -28,12 +34,27 @@ export default function CategoriesPage() {
 
   function handleOpenModal() {
     setName("");
+    setError("");
     setIsModalOpen(true);
   }
 
-  function handleSave() {
-    console.log("Save category:", { name });
-    setIsModalOpen(false);
+  async function handleSave() {
+    setError("");
+    if (!name.trim()) {
+      setError("Category name is required");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const category = await createCategory({ name: name.trim() });
+      setCategories((prev) => [category, ...prev]);
+      setIsModalOpen(false);
+    } catch {
+      setError("Failed to save category");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -82,21 +103,26 @@ export default function CategoriesPage() {
               placeholder="Category name"
               autoFocus
             />
+            {error && (
+              <p className="mt-1 text-sm text-red-600">{error}</p>
+            )}
           </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral"
+              disabled={isSaving}
+              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
+              disabled={isSaving}
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:opacity-50"
             >
-              Save
+              {isSaving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
