@@ -56,7 +56,6 @@
 | ----------- | -------------------------- | ------------------- |
 | `id`        | UUID                       | PK                  |
 | `name`      | String                     | Not null            |
-| `type`      | Enum (`INCOME`, `EXPENSE`) | Not null            |
 | `userId`    | UUID                       | FK → User, not null |
 | `createdAt` | DateTime                   | Default now         |
 | `updatedAt` | DateTime                   | Auto-updated        |
@@ -71,7 +70,6 @@ Index: `userId + name` (unique)
 | `amount`      | Decimal(12,2)              | Not null                |
 | `description` | String                     | Optional                |
 | `date`        | DateTime                   | Not null                |
-| `type`        | Enum (`INCOME`, `EXPENSE`) | Not null                |
 | `userId`      | UUID                       | FK → User, not null     |
 | `categoryId`  | UUID                       | FK → Category, not null |
 | `createdAt`   | DateTime                   | Default now             |

@@ -38,3 +38,4 @@
 | Integration Tests      | No test DB setup, no seeded data, no test files                                                    |
 | E2E Tests (Playwright) | Not installed, no config, no test files                                                            |
 | Lib Utilities          | No formatting, validation, or helper utilities                                                     |
+| Remove type columns    | Remove `type` enum from Category and Transaction models; polarity determined by sign of `amount`    |
