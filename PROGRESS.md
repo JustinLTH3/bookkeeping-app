@@ -23,6 +23,10 @@
 
 ## In Progress
 
+| Feature                  | Details                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------- |
+| Unit Tests (Vitest)      | Vitest installed; `getCategories` unit tests in `tests/actions/categories.test.ts`          |
+
 ## Not Started
 
 | Feature            | Details                                                                                            |
