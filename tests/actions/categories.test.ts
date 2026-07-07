@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getCategories, createCategory, deleteCategory, renameCategory } from "@/actions/categories";
+import {
+  getCategories,
+  createCategory,
+  deleteCategory,
+  renameCategory,
+} from "@/actions/categories";
 
-const { mockAuth, mockFindMany, mockCreate, mockDelete, mockUpdate, mockRevalidatePath } = vi.hoisted(() => ({
+const {
+  mockAuth,
+  mockFindMany,
+  mockCreate,
+  mockDelete,
+  mockUpdate,
+  mockRevalidatePath,
+} = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockFindMany: vi.fn(),
   mockCreate: vi.fn(),
@@ -67,7 +79,6 @@ describe("getCategories", () => {
 
     expect(result).toEqual([]);
   });
-
 });
 
 describe("createCategory", () => {
@@ -89,21 +100,27 @@ describe("createCategory", () => {
   it("throws Unauthorized when no session", async () => {
     mockAuth.mockResolvedValue(null);
 
-    await expect(createCategory({ name: "Food" })).rejects.toThrow("Unauthorized");
+    await expect(createCategory({ name: "Food" })).rejects.toThrow(
+      "Unauthorized",
+    );
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("throws Category name is required for empty string", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
-    await expect(createCategory({ name: "" })).rejects.toThrow("Category name is required");
+    await expect(createCategory({ name: "" })).rejects.toThrow(
+      "Category name is required",
+    );
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("throws Category name is required for whitespace-only name", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
-    await expect(createCategory({ name: "   " })).rejects.toThrow("Category name is required");
+    await expect(createCategory({ name: "   " })).rejects.toThrow(
+      "Category name is required",
+    );
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
@@ -114,7 +131,9 @@ describe("createCategory", () => {
     await createCategory({ name: "  Groceries  " });
 
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { name: "Groceries", userId: "user-1" } })
+      expect.objectContaining({
+        data: { name: "Groceries", userId: "user-1" },
+      }),
     );
   });
 
@@ -123,7 +142,9 @@ describe("createCategory", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockCreate.mockRejectedValue(error);
 
-    await expect(createCategory({ name: "Food" })).rejects.toThrow("Unique constraint failed");
+    await expect(createCategory({ name: "Food" })).rejects.toThrow(
+      "Unique constraint failed",
+    );
   });
 });
 
@@ -155,7 +176,9 @@ describe("deleteCategory", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockDelete.mockRejectedValue(error);
 
-    await expect(deleteCategory("cat-1")).rejects.toThrow("Foreign key constraint violation");
+    await expect(deleteCategory("cat-1")).rejects.toThrow(
+      "Foreign key constraint violation",
+    );
   });
 
   it("throws RecordNotFound when category does not exist", async () => {
@@ -163,7 +186,9 @@ describe("deleteCategory", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockDelete.mockRejectedValue(error);
 
-    await expect(deleteCategory("nonexistent-id")).rejects.toThrow("Record to delete does not exist");
+    await expect(deleteCategory("nonexistent-id")).rejects.toThrow(
+      "Record to delete does not exist",
+    );
   });
 });
 
@@ -187,21 +212,27 @@ describe("renameCategory", () => {
   it("throws Unauthorized when no session", async () => {
     mockAuth.mockResolvedValue(null);
 
-    await expect(renameCategory({ id: "cat-1", name: "Bills" })).rejects.toThrow("Unauthorized");
+    await expect(
+      renameCategory({ id: "cat-1", name: "Bills" }),
+    ).rejects.toThrow("Unauthorized");
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("throws Category name is required for empty string", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
-    await expect(renameCategory({ id: "cat-1", name: "" })).rejects.toThrow("Category name is required");
+    await expect(renameCategory({ id: "cat-1", name: "" })).rejects.toThrow(
+      "Category name is required",
+    );
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("throws Category name is required for whitespace-only name", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
-    await expect(renameCategory({ id: "cat-1", name: "   " })).rejects.toThrow("Category name is required");
+    await expect(renameCategory({ id: "cat-1", name: "   " })).rejects.toThrow(
+      "Category name is required",
+    );
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -212,7 +243,7 @@ describe("renameCategory", () => {
     await renameCategory({ id: "cat-1", name: "  Bills  " });
 
     expect(mockUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { name: "Bills" } })
+      expect.objectContaining({ data: { name: "Bills" } }),
     );
   });
 });

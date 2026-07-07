@@ -64,7 +64,9 @@ export default function CategoriesPage() {
       await deleteCategory(id);
       setCategories((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : "Failed to delete category");
+      setDeleteError(
+        err instanceof Error ? err.message : "Failed to delete category",
+      );
     }
   }
 

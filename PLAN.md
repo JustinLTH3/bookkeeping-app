@@ -52,28 +52,28 @@
 
 **Category**
 
-| Column      | Type                       | Constraints         |
-| ----------- | -------------------------- | ------------------- |
-| `id`        | UUID                       | PK                  |
-| `name`      | String                     | Not null            |
-| `userId`    | UUID                       | FK → User, not null |
-| `createdAt` | DateTime                   | Default now         |
-| `updatedAt` | DateTime                   | Auto-updated        |
+| Column      | Type     | Constraints         |
+| ----------- | -------- | ------------------- |
+| `id`        | UUID     | PK                  |
+| `name`      | String   | Not null            |
+| `userId`    | UUID     | FK → User, not null |
+| `createdAt` | DateTime | Default now         |
+| `updatedAt` | DateTime | Auto-updated        |
 
 Index: `userId + name` (unique)
 
 **Transaction**
 
-| Column        | Type                       | Constraints             |
-| ------------- | -------------------------- | ----------------------- |
-| `id`          | UUID                       | PK                      |
-| `amount`      | Decimal(12,2)              | Not null                |
-| `description` | String                     | Optional                |
-| `date`        | DateTime                   | Not null                |
-| `userId`      | UUID                       | FK → User, not null     |
-| `categoryId`  | UUID                       | FK → Category, not null |
-| `createdAt`   | DateTime                   | Default now             |
-| `updatedAt`   | DateTime                   | Auto-updated            |
+| Column        | Type          | Constraints             |
+| ------------- | ------------- | ----------------------- |
+| `id`          | UUID          | PK                      |
+| `amount`      | Decimal(12,2) | Not null                |
+| `description` | String        | Optional                |
+| `date`        | DateTime      | Not null                |
+| `userId`      | UUID          | FK → User, not null     |
+| `categoryId`  | UUID          | FK → Category, not null |
+| `createdAt`   | DateTime      | Default now             |
+| `updatedAt`   | DateTime      | Auto-updated            |
 
 Indexes:
 
