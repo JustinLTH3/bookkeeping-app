@@ -8,6 +8,7 @@ import {
   getCategories,
   createCategory,
   renameCategory,
+  deleteCategory,
 } from "@/actions/categories";
 
 export type Category = {
@@ -25,6 +26,7 @@ export default function CategoriesPage() {
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     getCategories().then(setCategories);
@@ -54,6 +56,16 @@ export default function CategoriesPage() {
   function handleCloseModal() {
     setEditingCategory(null);
     setIsModalOpen(false);
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteError("");
+    try {
+      await deleteCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete category");
+    }
   }
 
   async function handleSave() {
@@ -101,9 +113,13 @@ export default function CategoriesPage() {
       </div>
 
       <div className="mt-8">
+        {deleteError && (
+          <p className="mb-4 text-sm text-red-600">{deleteError}</p>
+        )}
         <CategoryTable
           categories={paginatedCategories}
           onEdit={handleOpenEditModal}
+          onDelete={handleDelete}
         />
         <Pagination
           currentPage={currentPage}

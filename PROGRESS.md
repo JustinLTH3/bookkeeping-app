@@ -19,13 +19,9 @@
 | Sidebar                   | `src/components/layout/Sidebar.tsx` — nav links (Dashboard, Transactions, Categories), active state, sign out                                                |
 | Pagination                | `src/components/ui/Pagination.tsx` — Prev/Next, page numbers with ellipsis, "Page X of Y" indicator                                                          |
 | Color Scheme              | Custom tokens: `--color-primary`, `--color-secondary`, `--color-tertiary`, `--color-neutral`                                                                 |
+| Category CRUD             | Server actions + page for create, read, update, delete; CategoryTable with functional Edit/Delete buttons; error handling on delete                          |
 
 ## In Progress
-
-| Feature         | Details                                                                                                                     |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Categories Page | `src/app/(app)/categories/` — fetches from DB, server actions, add category via modal, pagination (10/page), Edit/Delete stubs |
-| CategoryTable   | `src/components/categories/CategoryTable.tsx` — fixed row count, Name + Actions columns, no type column                     |
 
 ## Not Started
 

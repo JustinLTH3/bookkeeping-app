@@ -5,9 +5,10 @@ const ITEMS_PER_PAGE = 10;
 type Props = {
   categories: Category[];
   onEdit: (category: Category) => void;
+  onDelete: (id: string) => void;
 };
 
-export function CategoryTable({ categories, onEdit }: Props) {
+export function CategoryTable({ categories, onEdit, onDelete }: Props) {
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - categories.length);
 
   return (
@@ -39,6 +40,7 @@ export function CategoryTable({ categories, onEdit }: Props) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => onDelete(category.id)}
                   className="ml-1 rounded-md px-3 py-1.5 font-medium text-red-600 hover:bg-red-50"
                 >
                   Delete
