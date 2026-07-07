@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getCategories } from "@/actions/categories";
+import { getCategories, createCategory } from "@/actions/categories";
 
-const { mockAuth, mockFindMany } = vi.hoisted(() => ({
+const { mockAuth, mockFindMany, mockCreate, mockRevalidatePath } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockFindMany: vi.fn(),
+  mockCreate: vi.fn(),
+  mockRevalidatePath: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -14,12 +16,13 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     category: {
       findMany: mockFindMany,
+      create: mockCreate,
     },
   },
 }));
 
 vi.mock("next/cache", () => ({
-  revalidatePath: vi.fn(),
+  revalidatePath: mockRevalidatePath,
 }));
 
 beforeEach(() => {
@@ -61,4 +64,53 @@ describe("getCategories", () => {
     expect(result).toEqual([]);
   });
 
+});
+
+describe("createCategory", () => {
+  it("creates and returns a category with trimmed name", async () => {
+    const category = { id: "cat-1", name: "Food" };
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockCreate.mockResolvedValue(category);
+
+    const result = await createCategory({ name: "Food" });
+
+    expect(result).toEqual(category);
+    expect(mockCreate).toHaveBeenCalledWith({
+      data: { name: "Food", userId: "user-1" },
+      select: { id: true, name: true },
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(createCategory({ name: "Food" })).rejects.toThrow("Unauthorized");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("throws Category name is required for empty string", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(createCategory({ name: "" })).rejects.toThrow("Category name is required");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("throws Category name is required for whitespace-only name", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(createCategory({ name: "   " })).rejects.toThrow("Category name is required");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it("trims whitespace from name", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockCreate.mockResolvedValue({ id: "cat-1", name: "Groceries" });
+
+    await createCategory({ name: "  Groceries  " });
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: "Groceries", userId: "user-1" } })
+    );
+  });
 });
