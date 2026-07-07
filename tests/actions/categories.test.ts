@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getCategories, createCategory, deleteCategory } from "@/actions/categories";
+import { getCategories, createCategory, deleteCategory, renameCategory } from "@/actions/categories";
 
-const { mockAuth, mockFindMany, mockCreate, mockDelete, mockRevalidatePath } = vi.hoisted(() => ({
+const { mockAuth, mockFindMany, mockCreate, mockDelete, mockUpdate, mockRevalidatePath } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockFindMany: vi.fn(),
   mockCreate: vi.fn(),
   mockDelete: vi.fn(),
+  mockUpdate: vi.fn(),
   mockRevalidatePath: vi.fn(),
 }));
 
@@ -19,6 +20,7 @@ vi.mock("@/lib/prisma", () => ({
       findMany: mockFindMany,
       create: mockCreate,
       delete: mockDelete,
+      update: mockUpdate,
     },
   },
 }));
@@ -115,6 +117,14 @@ describe("createCategory", () => {
       expect.objectContaining({ data: { name: "Groceries", userId: "user-1" } })
     );
   });
+
+  it("propagates Prisma errors (e.g., unique constraint violation)", async () => {
+    const error = new Error("Unique constraint failed");
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockCreate.mockRejectedValue(error);
+
+    await expect(createCategory({ name: "Food" })).rejects.toThrow("Unique constraint failed");
+  });
 });
 
 describe("deleteCategory", () => {
@@ -146,5 +156,63 @@ describe("deleteCategory", () => {
     mockDelete.mockRejectedValue(error);
 
     await expect(deleteCategory("cat-1")).rejects.toThrow("Foreign key constraint violation");
+  });
+
+  it("throws RecordNotFound when category does not exist", async () => {
+    const error = new Error("Record to delete does not exist");
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockDelete.mockRejectedValue(error);
+
+    await expect(deleteCategory("nonexistent-id")).rejects.toThrow("Record to delete does not exist");
+  });
+});
+
+describe("renameCategory", () => {
+  it("renames and returns the category with trimmed name", async () => {
+    const category = { id: "cat-1", name: "Bills" };
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockUpdate.mockResolvedValue(category);
+
+    const result = await renameCategory({ id: "cat-1", name: "Bills" });
+
+    expect(result).toEqual(category);
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: "cat-1", userId: "user-1" },
+      data: { name: "Bills" },
+      select: { id: true, name: true },
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(renameCategory({ id: "cat-1", name: "Bills" })).rejects.toThrow("Unauthorized");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Category name is required for empty string", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(renameCategory({ id: "cat-1", name: "" })).rejects.toThrow("Category name is required");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Category name is required for whitespace-only name", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(renameCategory({ id: "cat-1", name: "   " })).rejects.toThrow("Category name is required");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("trims whitespace from name", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockUpdate.mockResolvedValue({ id: "cat-1", name: "Bills" });
+
+    await renameCategory({ id: "cat-1", name: "  Bills  " });
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: "Bills" } })
+    );
   });
 });

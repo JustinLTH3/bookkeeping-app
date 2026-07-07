@@ -26,7 +26,7 @@
 
 | Feature                  | Details                                                                                     |
 | ------------------------ | ------------------------------------------------------------------------------------------- |
-| Unit Tests (Vitest)      | Vitest installed; `getCategories` unit tests in `tests/actions/categories.test.ts`          |
+| Unit Tests (Vitest)      | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts` |
 
 ## Not Started
 
