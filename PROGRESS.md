@@ -20,6 +20,7 @@
 | Pagination                | `src/components/ui/Pagination.tsx` — Prev/Next, page numbers with ellipsis, "Page X of Y" indicator                                                          |
 | Color Scheme              | Custom tokens: `--color-primary`, `--color-secondary`, `--color-tertiary`, `--color-neutral`                                                                 |
 | Category CRUD             | Server actions + page for create, read, update, delete; CategoryTable with functional Edit/Delete buttons; error handling on delete                          |
+| Default Categories        | Default categories (Food, Transport, Housing, Utilities, Entertainment, Salary, Other) auto-created via Auth.js `events.createUser` on first signup          |
 
 ## In Progress
 
