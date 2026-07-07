@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getCategories, createCategory } from "@/actions/categories";
+import { getCategories, createCategory, deleteCategory } from "@/actions/categories";
 
-const { mockAuth, mockFindMany, mockCreate, mockRevalidatePath } = vi.hoisted(() => ({
+const { mockAuth, mockFindMany, mockCreate, mockDelete, mockRevalidatePath } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
   mockFindMany: vi.fn(),
   mockCreate: vi.fn(),
+  mockDelete: vi.fn(),
   mockRevalidatePath: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock("@/lib/prisma", () => ({
     category: {
       findMany: mockFindMany,
       create: mockCreate,
+      delete: mockDelete,
     },
   },
 }));
@@ -112,5 +114,37 @@ describe("createCategory", () => {
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: { name: "Groceries", userId: "user-1" } })
     );
+  });
+});
+
+describe("deleteCategory", () => {
+  it("deletes and returns the category", async () => {
+    const category = { id: "cat-1", name: "Food" };
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockDelete.mockResolvedValue(category);
+
+    const result = await deleteCategory("cat-1");
+
+    expect(result).toEqual(category);
+    expect(mockDelete).toHaveBeenCalledWith({
+      where: { id: "cat-1", userId: "user-1" },
+      select: { id: true, name: true },
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(deleteCategory("cat-1")).rejects.toThrow("Unauthorized");
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("propagates Prisma errors (e.g., linked transactions)", async () => {
+    const error = new Error("Foreign key constraint violation");
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockDelete.mockRejectedValue(error);
+
+    await expect(deleteCategory("cat-1")).rejects.toThrow("Foreign key constraint violation");
   });
 });
