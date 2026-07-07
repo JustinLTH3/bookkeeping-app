@@ -1,13 +1,13 @@
 ## Tech Stack
 
-| Layer | Choice |
-|-------|--------|
-| Framework | Next.js 15 (App Router, TypeScript) |
-| Styling | Tailwind CSS |
-| Auth | Auth.js — Google OAuth |
-| Database | PostgreSQL |
-| ORM | Prisma |
-| Charts | Chart.js + react-chartjs-2 |
+| Layer     | Choice                              |
+| --------- | ----------------------------------- |
+| Framework | Next.js 16 (App Router, TypeScript) |
+| Styling   | Tailwind CSS                        |
+| Auth      | Auth.js — Google OAuth              |
+| Database  | PostgreSQL                          |
+| ORM       | Prisma                              |
+| Charts    | Chart.js + react-chartjs-2          |
 
 ## Features
 
@@ -41,43 +41,42 @@
 
 ### NextAuth Tables (managed by `@auth/prisma-adapter`)
 
-| Table | Key Columns | Notes |
-|-------|-------------|-------|
-| **User** | `id`, `name`, `email` (unique), `emailVerified`, `image` | Stores app user data |
-| **Account** | `id`, `userId` (FK), `provider`, `providerAccountId`, `type`, `access_token`, `refresh_token`, `expires_at`, `scope`, `id_token` | Links OAuth provider to user |
-| **Session** | `id`, `sessionToken` (unique), `userId` (FK), `expires` | Session management |
-| **VerificationToken** | `identifier`, `token` (unique), `expires` | Composite PK on `(identifier, token)` |
+| Table                 | Key Columns                                                                                                                      | Notes                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **User**              | `id`, `name`, `email` (unique), `emailVerified`, `image`                                                                         | Stores app user data                  |
+| **Account**           | `id`, `userId` (FK), `provider`, `providerAccountId`, `type`, `access_token`, `refresh_token`, `expires_at`, `scope`, `id_token` | Links OAuth provider to user          |
+| **Session**           | `id`, `sessionToken` (unique), `userId` (FK), `expires`                                                                          | Session management                    |
+| **VerificationToken** | `identifier`, `token` (unique), `expires`                                                                                        | Composite PK on `(identifier, token)` |
 
 ### Application Tables
 
 **Category**
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| `id` | UUID | PK |
-| `name` | String | Not null |
-| `type` | Enum (`INCOME`, `EXPENSE`) | Not null |
-| `userId` | UUID | FK → User, not null |
-| `createdAt` | DateTime | Default now |
-| `updatedAt` | DateTime | Auto-updated |
+| Column      | Type     | Constraints         |
+| ----------- | -------- | ------------------- |
+| `id`        | UUID     | PK                  |
+| `name`      | String   | Not null            |
+| `userId`    | UUID     | FK → User, not null |
+| `createdAt` | DateTime | Default now         |
+| `updatedAt` | DateTime | Auto-updated        |
 
 Index: `userId + name` (unique)
 
 **Transaction**
 
-| Column | Type | Constraints |
-|--------|------|-------------|
-| `id` | UUID | PK |
-| `amount` | Decimal(12,2) | Not null |
-| `description` | String | Optional |
-| `date` | DateTime | Not null |
-| `type` | Enum (`INCOME`, `EXPENSE`) | Not null |
-| `userId` | UUID | FK → User, not null |
-| `categoryId` | UUID | FK → Category, not null |
-| `createdAt` | DateTime | Default now |
-| `updatedAt` | DateTime | Auto-updated |
+| Column        | Type          | Constraints             |
+| ------------- | ------------- | ----------------------- |
+| `id`          | UUID          | PK                      |
+| `amount`      | Decimal(12,2) | Not null                |
+| `description` | String        | Optional                |
+| `date`        | DateTime      | Not null                |
+| `userId`      | UUID          | FK → User, not null     |
+| `categoryId`  | UUID          | FK → Category, not null |
+| `createdAt`   | DateTime      | Default now             |
+| `updatedAt`   | DateTime      | Auto-updated            |
 
 Indexes:
+
 - `userId + date` (composite)
 - `categoryId`
 
@@ -101,13 +100,13 @@ Category 1──N Transaction
 
 #### What to test
 
-| Area | Details |
-|---|---|
-| **Data aggregation (dashboard)** | Totals by type (income/expense), totals by category, cumulative balance over time, date-range filtering |
-| **Form validation** | Required fields, positive amounts, valid date ranges, enum constraints for transaction/category types, string length limits |
-| **Filtering & sorting** | Transaction filtering by date range, by category, by type; sorting by date, by amount |
-| **Formatting** | Currency display, date display, amount decimal handling |
-| **Auth utilities** | Session validation, route protection logic |
+| Area                             | Details                                                                                                                     |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Data aggregation (dashboard)** | Totals by type (income/expense), totals by category, cumulative balance over time, date-range filtering                     |
+| **Form validation**              | Required fields, positive amounts, valid date ranges, enum constraints for transaction/category types, string length limits |
+| **Filtering & sorting**          | Transaction filtering by date range, by category, by type; sorting by date, by amount                                       |
+| **Formatting**                   | Currency display, date display, amount decimal handling                                                                     |
+| **Auth utilities**               | Session validation, route protection logic                                                                                  |
 
 #### Edge cases
 
@@ -125,13 +124,13 @@ Category 1──N Transaction
 
 #### What to test
 
-| Area | Details |
-|---|---|
-| **Transactions server actions** | Create, read, update, delete — verify rows are correctly written/read/updated/removed |
-| **Categories server actions** | Create, read, update, delete — verify unique constraint on (userId, name), handle category deletion when linked transactions exist |
-| **Dashboard queries** | Aggregated queries return correct totals, category breakdowns, and date-filtered results matching seeded data |
-| **Multi-tenancy** | User A cannot see, modify, or delete User B's data — verify userId scoping on every action |
-| **Foreign key constraints** | Transaction references nonexistent category → error; User deletion cascade/restrict behavior |
+| Area                            | Details                                                                                                                            |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Transactions server actions** | Create, read, update, delete — verify rows are correctly written/read/updated/removed                                              |
+| **Categories server actions**   | Create, read, update, delete — verify unique constraint on (userId, name), handle category deletion when linked transactions exist |
+| **Dashboard queries**           | Aggregated queries return correct totals, category breakdowns, and date-filtered results matching seeded data                      |
+| **Multi-tenancy**               | User A cannot see, modify, or delete User B's data — verify userId scoping on every action                                         |
+| **Foreign key constraints**     | Transaction references nonexistent category → error; User deletion cascade/restrict behavior                                       |
 
 #### Strategy
 
@@ -153,18 +152,18 @@ Category 1──N Transaction
 
 #### What to test
 
-| Flow | Steps |
-|---|---|
-| **Login** | Visit app → redirected to login → click sign-in → mock OAuth → redirected to dashboard |
-| **Dashboard** | Verify summary cards, charts rendered with seeded data |
-| **Create transaction** | Navigate to form → fill all fields → submit → verify row appears in table |
-| **Edit transaction** | Click edit → form pre-filled → modify → submit → row updates |
-| **Delete transaction** | Click delete → confirm → row removed |
-| **Transaction filters** | Filter by date range, by category → verify rows narrow; clear filters → all rows return |
-| **Category CRUD** | Create, edit, delete categories through the UI |
-| **Multi-user isolation** | Login as User A, create data, logout → login as User B → verify User A's data is invisible |
-| **Error states** | Submit empty form → validation errors shown; submit invalid data → rejected; server unavailable → error message |
-| **Responsive layout** | Test at mobile (320px), tablet (768px), desktop (1280px) |
+| Flow                     | Steps                                                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Login**                | Visit app → redirected to login → click sign-in → mock OAuth → redirected to dashboard                          |
+| **Dashboard**            | Verify summary cards, charts rendered with seeded data                                                          |
+| **Create transaction**   | Navigate to form → fill all fields → submit → verify row appears in table                                       |
+| **Edit transaction**     | Click edit → form pre-filled → modify → submit → row updates                                                    |
+| **Delete transaction**   | Click delete → confirm → row removed                                                                            |
+| **Transaction filters**  | Filter by date range, by category → verify rows narrow; clear filters → all rows return                         |
+| **Category CRUD**        | Create, edit, delete categories through the UI                                                                  |
+| **Multi-user isolation** | Login as User A, create data, logout → login as User B → verify User A's data is invisible                      |
+| **Error states**         | Submit empty form → validation errors shown; submit invalid data → rejected; server unavailable → error message |
+| **Responsive layout**    | Test at mobile (320px), tablet (768px), desktop (1280px)                                                        |
 
 #### Auth strategy
 
