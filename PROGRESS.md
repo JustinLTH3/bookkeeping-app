@@ -36,7 +36,6 @@
 | Transactions Page      | `src/app/transactions/` — table with date/category filters, add/edit form, CRUD operations         |
 | Chart Components       | `src/components/charts/` — BarChart, PieChart, LineChart                                           |
 | Server Actions         | `src/actions/` — transaction CRUD, category CRUD, dashboard aggregation queries                    |
-| Unit Tests (Vitest)    | Not installed, no config, no test files                                                            |
 | Integration Tests      | No test DB setup, no seeded data, no test files                                                    |
 | E2E Tests (Playwright) | Not installed, no config, no test files                                                            |
 | Lib Utilities          | No formatting, validation, or helper utilities                                                     |
