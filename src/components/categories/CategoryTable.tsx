@@ -30,21 +30,23 @@ export function CategoryTable({ categories, onEdit, onDelete }: Props) {
               <td className="px-6 py-4 text-primary text-sm font-medium whitespace-nowrap">
                 {category.name}
               </td>
-              <td className="px-6 py-4 text-right text-sm whitespace-nowrap">
-                <button
-                  type="button"
-                  onClick={() => onEdit(category)}
-                  className="rounded-md px-3 py-1.5 font-medium text-secondary hover:bg-secondary/10"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(category.id)}
-                  className="ml-1 rounded-md px-3 py-1.5 font-medium text-red-600 hover:bg-red-50"
-                >
-                  Delete
-                </button>
+              <td className="px-6 py-4 text-sm">
+                <div className="flex flex-row items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onEdit(category)}
+                    className="rounded-md px-3 py-1.5 font-medium bg-secondary/10 text-secondary hover:bg-secondary/20"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(category.id)}
+                    className="rounded-md px-3 py-1.5 font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
