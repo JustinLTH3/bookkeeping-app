@@ -123,14 +123,26 @@ export default function TransactionsPage() {
 
     if (editingTransaction) {
       try {
-        const updated = await updateTransaction(editingTransaction.id, {
+        await updateTransaction(editingTransaction.id, {
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
         });
+        const category = categories.find((c) => c.id === categoryId)!;
         setTransactions((prev) =>
-          prev.map((t) => (t.id === editingTransaction.id ? updated : t)),
+          prev.map((t) =>
+            t.id === editingTransaction.id
+              ? {
+                  ...t,
+                  amount: numAmount,
+                  description: description || null,
+                  date,
+                  categoryId,
+                  category,
+                }
+              : t,
+          ),
         );
         handleCloseModal();
       } catch (e) {

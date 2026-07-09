@@ -84,7 +84,7 @@ export async function updateTransaction(
     date: string;
     categoryId: string;
   },
-): Promise<TransactionResponse> {
+): Promise<void> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -98,7 +98,7 @@ export async function updateTransaction(
     throw new Error("Category is required");
   }
 
-  const transaction = await prisma.transaction.update({
+  await prisma.transaction.update({
     where: { id, userId: session.user.id },
     data: {
       amount: data.amount,
@@ -106,19 +106,9 @@ export async function updateTransaction(
       date: dayjs(data.date).toDate(),
       categoryId: data.categoryId,
     },
-    include: { category: { select: { id: true, name: true } } },
   });
 
   revalidatePath("/transactions");
-
-  return {
-    id: transaction.id,
-    amount: Number(transaction.amount),
-    description: transaction.description,
-    date: dayjs(transaction.date).format("YYYY-MM-DD"),
-    categoryId: transaction.categoryId,
-    category: transaction.category,
-  };
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
