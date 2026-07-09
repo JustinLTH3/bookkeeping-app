@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
+import { getTransactions, createTransaction } from "@/actions/transactions";
+import { getCategories } from "@/actions/categories";
 import dayjs from "dayjs";
 
 export type Transaction = {
@@ -19,81 +21,10 @@ type Category = { id: string; name: string };
 
 const ITEMS_PER_PAGE = 10;
 
-const DEFAULT_CATEGORIES: Category[] = [
-  { id: "cat-food", name: "Food" },
-  { id: "cat-transport", name: "Transport" },
-  { id: "cat-housing", name: "Housing" },
-  { id: "cat-utilities", name: "Utilities" },
-  { id: "cat-entertainment", name: "Entertainment" },
-  { id: "cat-salary", name: "Salary" },
-  { id: "cat-other", name: "Other" },
-];
-
-function generateId() {
-  return Math.random().toString(36).substring(2, 15);
-}
-
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  {
-    id: "1",
-    amount: 5000,
-    description: "Monthly salary",
-    date: "2026-07-01",
-    categoryId: "cat-salary",
-    category: { id: "cat-salary", name: "Salary" },
-  },
-  {
-    id: "2",
-    amount: -25.5,
-    description: "Lunch with team",
-    date: "2026-07-02",
-    categoryId: "cat-food",
-    category: { id: "cat-food", name: "Food" },
-  },
-  {
-    id: "3",
-    amount: -15,
-    description: "Gas station",
-    date: "2026-07-03",
-    categoryId: "cat-transport",
-    category: { id: "cat-transport", name: "Transport" },
-  },
-  {
-    id: "4",
-    amount: -120,
-    description: "Electric bill",
-    date: "2026-07-05",
-    categoryId: "cat-utilities",
-    category: { id: "cat-utilities", name: "Utilities" },
-  },
-  {
-    id: "5",
-    amount: -45,
-    description: "Movie tickets",
-    date: "2026-07-06",
-    categoryId: "cat-entertainment",
-    category: { id: "cat-entertainment", name: "Entertainment" },
-  },
-  {
-    id: "6",
-    amount: -12.75,
-    description: "Coffee",
-    date: "2026-07-06",
-    categoryId: "cat-food",
-    category: { id: "cat-food", name: "Food" },
-  },
-  {
-    id: "7",
-    amount: -1500,
-    description: "Rent",
-    date: "2026-07-01",
-    categoryId: "cat-housing",
-    category: { id: "cat-housing", name: "Housing" },
-  },
-];
-
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
@@ -101,10 +32,28 @@ export default function TransactionsPage() {
 
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
-  const [categoryId, setCategoryId] = useState(DEFAULT_CATEGORIES[0].id);
+  const [categoryId, setCategoryId] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [txns, cats] = await Promise.all([
+          getTransactions(),
+          getCategories(),
+        ]);
+        setTransactions(txns);
+        setCategories(cats);
+      } catch {
+        // keep empty state on error
+      } finally {
+        setInitialLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
 
@@ -117,7 +66,7 @@ export default function TransactionsPage() {
     setEditingTransaction(null);
     setAmount("");
     setDate(dayjs().format("YYYY-MM-DD"));
-    setCategoryId(DEFAULT_CATEGORIES[0].id);
+    setCategoryId(categories[0]?.id ?? "");
     setDescription("");
     setError("");
     setIsModalOpen(true);
@@ -143,7 +92,7 @@ export default function TransactionsPage() {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   }
 
-  function handleSave() {
+  async function handleSave() {
     setError("");
 
     const numAmount = parseFloat(amount);
@@ -160,9 +109,12 @@ export default function TransactionsPage() {
       return;
     }
 
-    const category = DEFAULT_CATEGORIES.find((c) => c.id === categoryId)!;
-
     if (editingTransaction) {
+      const category = categories.find((c) => c.id === categoryId);
+      if (!category) {
+        setError("Category not found");
+        return;
+      }
       setTransactions((prev) =>
         prev.map((t) =>
           t.id === editingTransaction.id
@@ -170,21 +122,21 @@ export default function TransactionsPage() {
             : t,
         ),
       );
+      handleCloseModal();
     } else {
-      setTransactions((prev) => [
-        {
-          id: generateId(),
+      try {
+        const created = await createTransaction({
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
-          category,
-        },
-        ...prev,
-      ]);
+        });
+        setTransactions((prev) => [created, ...prev]);
+        handleCloseModal();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to create transaction");
+      }
     }
-
-    handleCloseModal();
   }
 
   return (
@@ -203,19 +155,25 @@ export default function TransactionsPage() {
       </div>
 
       <div className="mt-8">
-        {deleteError && (
-          <p className="mb-4 text-sm text-red-600">{deleteError}</p>
+        {initialLoading ? (
+          <p className="text-sm text-tertiary">Loading transactions...</p>
+        ) : (
+          <>
+            {deleteError && (
+              <p className="mb-4 text-sm text-red-600">{deleteError}</p>
+            )}
+            <TransactionTable
+              transactions={paginatedTransactions}
+              onEdit={handleOpenEditModal}
+              onDelete={handleDelete}
+            />
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </>
         )}
-        <TransactionTable
-          transactions={paginatedTransactions}
-          onEdit={handleOpenEditModal}
-          onDelete={handleDelete}
-        />
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={setCurrentPage}
-        />
       </div>
 
       <Modal
@@ -272,7 +230,10 @@ export default function TransactionsPage() {
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
             >
-              {DEFAULT_CATEGORIES.map((cat) => (
+              <option value="" disabled>
+                Select a category
+              </option>
+              {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
                 </option>
