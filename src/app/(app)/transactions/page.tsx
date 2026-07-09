@@ -8,6 +8,7 @@ import {
   getTransactions,
   createTransaction,
   updateTransaction,
+  deleteTransaction,
 } from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
 import dayjs from "dayjs";
@@ -91,9 +92,16 @@ export default function TransactionsPage() {
     setIsModalOpen(false);
   }
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
     setDeleteError("");
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await deleteTransaction(id);
+      setTransactions((prev) => prev.filter((t) => t.id !== id));
+    } catch (e) {
+      setDeleteError(
+        e instanceof Error ? e.message : "Failed to delete transaction",
+      );
+    }
   }
 
   async function handleSave() {

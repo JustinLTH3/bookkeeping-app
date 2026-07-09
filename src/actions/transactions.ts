@@ -120,3 +120,14 @@ export async function updateTransaction(
     category: transaction.category,
   };
 }
+
+export async function deleteTransaction(id: string): Promise<void> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  await prisma.transaction.delete({
+    where: { id, userId: session.user.id },
+  });
+
+  revalidatePath("/transactions");
+}
