@@ -24,10 +24,10 @@
 
 ## In Progress
 
-| Feature                  | Details                                                                                                                                                                                         |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit Tests (Vitest)      | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts`                                |
-| Transactions Page        | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired |
+| Feature             | Details                                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit Tests (Vitest) | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts`                             |
+| Transactions Page   | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired |
 
 ## Not Started
 

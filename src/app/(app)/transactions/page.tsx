@@ -4,7 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
-import { getTransactions, createTransaction } from "@/actions/transactions";
+import {
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+} from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
 import dayjs from "dayjs";
 
@@ -110,19 +114,22 @@ export default function TransactionsPage() {
     }
 
     if (editingTransaction) {
-      const category = categories.find((c) => c.id === categoryId);
-      if (!category) {
-        setError("Category not found");
-        return;
+      try {
+        const updated = await updateTransaction(editingTransaction.id, {
+          amount: numAmount,
+          description: description || null,
+          date,
+          categoryId,
+        });
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === editingTransaction.id ? updated : t)),
+        );
+        handleCloseModal();
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Failed to update transaction",
+        );
       }
-      setTransactions((prev) =>
-        prev.map((t) =>
-          t.id === editingTransaction.id
-            ? { ...t, amount: numAmount, description: description || null, date, categoryId, category }
-            : t,
-        ),
-      );
-      handleCloseModal();
     } else {
       try {
         const created = await createTransaction({
@@ -134,7 +141,9 @@ export default function TransactionsPage() {
         setTransactions((prev) => [created, ...prev]);
         handleCloseModal();
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Failed to create transaction");
+        setError(
+          e instanceof Error ? e.message : "Failed to create transaction",
+        );
       }
     }
   }

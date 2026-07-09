@@ -75,3 +75,48 @@ export async function createTransaction(data: {
     category: transaction.category,
   };
 }
+
+export async function updateTransaction(
+  id: string,
+  data: {
+    amount: number;
+    description: string | null;
+    date: string;
+    categoryId: string;
+  },
+): Promise<TransactionResponse> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  if (!data.amount || isNaN(data.amount) || data.amount === 0) {
+    throw new Error("Amount must be a non-zero number");
+  }
+  if (!data.date) {
+    throw new Error("Date is required");
+  }
+  if (!data.categoryId) {
+    throw new Error("Category is required");
+  }
+
+  const transaction = await prisma.transaction.update({
+    where: { id, userId: session.user.id },
+    data: {
+      amount: data.amount,
+      description: data.description,
+      date: dayjs(data.date).toDate(),
+      categoryId: data.categoryId,
+    },
+    include: { category: { select: { id: true, name: true } } },
+  });
+
+  revalidatePath("/transactions");
+
+  return {
+    id: transaction.id,
+    amount: Number(transaction.amount),
+    description: transaction.description,
+    date: dayjs(transaction.date).format("YYYY-MM-DD"),
+    categoryId: transaction.categoryId,
+    category: transaction.category,
+  };
+}
