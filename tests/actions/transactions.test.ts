@@ -1,14 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getTransactions, createTransaction } from "@/actions/transactions";
+import {
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+} from "@/actions/transactions";
 
-const { mockAuth, mockFindMany, mockCreate, mockRevalidatePath } = vi.hoisted(
-  () => ({
-    mockAuth: vi.fn(),
-    mockFindMany: vi.fn(),
-    mockCreate: vi.fn(),
-    mockRevalidatePath: vi.fn(),
-  }),
-);
+const {
+  mockAuth,
+  mockFindMany,
+  mockCreate,
+  mockUpdate,
+  mockDelete,
+  mockRevalidatePath,
+} = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockFindMany: vi.fn(),
+  mockCreate: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockDelete: vi.fn(),
+  mockRevalidatePath: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({
   auth: mockAuth,
@@ -19,6 +31,8 @@ vi.mock("@/lib/prisma", () => ({
     transaction: {
       findMany: mockFindMany,
       create: mockCreate,
+      update: mockUpdate,
+      delete: mockDelete,
     },
   },
 }));
@@ -218,6 +232,122 @@ describe("createTransaction", () => {
 
     await expect(createTransaction(validData)).rejects.toThrow(
       "Unique constraint failed",
+    );
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateTransaction", () => {
+  const txnId = "txn-1";
+  const validData = {
+    amount: 150.0,
+    description: "Updated dinner",
+    date: "2024-07-01",
+    categoryId: "cat-2",
+  };
+
+  it("updates a transaction for authenticated user", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockUpdate.mockResolvedValue({});
+
+    await updateTransaction(txnId, validData);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: txnId, userId: "user-1" },
+      data: {
+        amount: 150.0,
+        description: "Updated dinner",
+        date: expect.any(Date),
+        categoryId: "cat-2",
+      },
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(updateTransaction(txnId, validData)).rejects.toThrow(
+      "Unauthorized",
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Amount must be a non-zero number when amount is 0", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(
+      updateTransaction(txnId, { ...validData, amount: 0 }),
+    ).rejects.toThrow("Amount must be a non-zero number");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Amount must be a non-zero number when amount is NaN", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(
+      updateTransaction(txnId, { ...validData, amount: NaN }),
+    ).rejects.toThrow("Amount must be a non-zero number");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Date is required when date is empty", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(
+      updateTransaction(txnId, { ...validData, date: "" }),
+    ).rejects.toThrow("Date is required");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("throws Category is required when categoryId is empty", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    await expect(
+      updateTransaction(txnId, { ...validData, categoryId: "" }),
+    ).rejects.toThrow("Category is required");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("propagates Prisma errors (record not found)", async () => {
+    const error = new Error("Record to update does not exist");
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockUpdate.mockRejectedValue(error);
+
+    await expect(updateTransaction(txnId, validData)).rejects.toThrow(
+      "Record to update does not exist",
+    );
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteTransaction", () => {
+  it("deletes a transaction for authenticated user", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockDelete.mockResolvedValue({});
+
+    await deleteTransaction("txn-1");
+
+    expect(mockDelete).toHaveBeenCalledWith({
+      where: { id: "txn-1", userId: "user-1" },
+    });
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(deleteTransaction("txn-1")).rejects.toThrow("Unauthorized");
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it("propagates Prisma errors (record not found)", async () => {
+    const error = new Error("Record to delete does not exist");
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockDelete.mockRejectedValue(error);
+
+    await expect(deleteTransaction("nonexistent-id")).rejects.toThrow(
+      "Record to delete does not exist",
     );
     expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
