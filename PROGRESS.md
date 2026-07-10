@@ -24,18 +24,18 @@
 
 ## In Progress
 
-| Feature             | Details                                                                                                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit Tests (Vitest) | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts` |
+| Feature             | Details                                                                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit Tests (Vitest) | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts`                             |
+| Transactions Page   | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired |
 
 ## Not Started
 
 | Feature                | Details                                                                                            |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
 | Dashboard              | Summary cards + bar/pie/line charts (income vs expense, by category, cumulative balance over time) |
-| Transactions Page      | `src/app/transactions/` — table with date/category filters, add/edit form, CRUD operations         |
 | Chart Components       | `src/components/charts/` — BarChart, PieChart, LineChart                                           |
-| Server Actions         | `src/actions/` — transaction CRUD, category CRUD, dashboard aggregation queries                    |
+| Server Actions         | `src/actions/` — transaction edit/delete, dashboard aggregation queries                            |
 | Integration Tests      | No test DB setup, no seeded data, no test files                                                    |
 | E2E Tests (Playwright) | Not installed, no config, no test files                                                            |
 | Lib Utilities          | No formatting, validation, or helper utilities                                                     |
