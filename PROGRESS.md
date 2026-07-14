@@ -29,13 +29,19 @@
 | Unit Tests (Vitest) | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`) in `tests/actions/categories.test.ts`                             |
 | Transactions Page   | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired |
 
+## Complete (cont.)
+
+| Feature             | Details                                                                                                                                                                                                    |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transaction Actions | `getTransactions`, `createTransaction` wired; test coverage for all 4 actions in `tests/actions/transactions.test.ts`                                                                                      |
+| Dashboard           | Summary cards (week income/expense, net balance, month net flow) + PieChart (expenses by category) + LineChart (cash flow with time range dropdown) + recent transactions table with link to /transactions |
+| Chart Components    | `src/components/charts/PieChart.tsx`, `src/components/charts/LineChart.tsx` using Chart.js + react-chartjs-2                                                                                               |
+| Dashboard Actions   | `src/actions/dashboard.ts` — `getDashboardSummary`, `getMonthlyExpensesByCategory`, `getCashFlow`, `getRecentTransactions`                                                                                 |
+
 ## Not Started
 
-| Feature                | Details                                                                                            |
-| ---------------------- | -------------------------------------------------------------------------------------------------- |
-| Dashboard              | Summary cards + bar/pie/line charts (income vs expense, by category, cumulative balance over time) |
-| Chart Components       | `src/components/charts/` — BarChart, PieChart, LineChart                                           |
-| Server Actions         | `src/actions/` — transaction edit/delete, dashboard aggregation queries                            |
-| Integration Tests      | No test DB setup, no seeded data, no test files                                                    |
-| E2E Tests (Playwright) | Not installed, no config, no test files                                                            |
-| Lib Utilities          | No formatting, validation, or helper utilities                                                     |
+| Feature                | Details                                         |
+| ---------------------- | ----------------------------------------------- |
+| Integration Tests      | No test DB setup, no seeded data, no test files |
+| E2E Tests (Playwright) | Not installed, no config, no test files         |
+| Lib Utilities          | No formatting, validation, or helper utilities  |
