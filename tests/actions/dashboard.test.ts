@@ -4,6 +4,8 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import {
   getDashboardSummary,
   getExpensesByCategory,
+  getCashFlow,
+  getRecentTransactions,
 } from "@/actions/dashboard";
 
 dayjs.extend(isoWeek);
@@ -247,6 +249,210 @@ describe("getExpensesByCategory", () => {
     mockFindMany.mockRejectedValue(error);
 
     await expect(getExpensesByCategory("month")).rejects.toThrow(
+      "Database connection failed",
+    );
+  });
+});
+
+describe("getCashFlow", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns cumulative daily balance", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
+
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    mockFindMany.mockResolvedValue([
+      { amount: 100, date: new Date("2024-06-12") },
+      { amount: -50, date: new Date("2024-06-14") },
+      { amount: 30, date: new Date("2024-06-14") },
+    ]);
+
+    const result = await getCashFlow("week");
+
+    expect(result).toEqual([
+      { date: "2024-06-10", balance: 0 },
+      { date: "2024-06-11", balance: 0 },
+      { date: "2024-06-12", balance: 100 },
+      { date: "2024-06-13", balance: 100 },
+      { date: "2024-06-14", balance: 80 },
+      { date: "2024-06-15", balance: 80 },
+      { date: "2024-06-16", balance: 80 },
+    ]);
+
+    const expectedStart = dayjs().startOf("isoWeek").toDate();
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", date: { gte: expectedStart } },
+      orderBy: { date: "asc" },
+      select: { amount: true, date: true },
+    });
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(getCashFlow("week")).rejects.toThrow("Unauthorized");
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it("returns zero-filled series when no transactions", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
+
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue([]);
+
+    const result = await getCashFlow("week");
+
+    expect(result).toHaveLength(7);
+    expect(result.every((p) => p.balance === 0)).toBe(true);
+  });
+
+  it("fills date gaps with previous balance", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
+
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue([
+      { amount: 50, date: new Date("2024-06-10") },
+      { amount: 50, date: new Date("2024-06-15") },
+    ]);
+
+    const result = await getCashFlow("week");
+
+    expect(result).toEqual([
+      { date: "2024-06-10", balance: 50 },
+      { date: "2024-06-11", balance: 50 },
+      { date: "2024-06-12", balance: 50 },
+      { date: "2024-06-13", balance: 50 },
+      { date: "2024-06-14", balance: 50 },
+      { date: "2024-06-15", balance: 100 },
+      { date: "2024-06-16", balance: 100 },
+    ]);
+  });
+
+  it("propagates Prisma errors", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    const error = new Error("Database connection failed");
+    mockFindMany.mockRejectedValue(error);
+
+    await expect(getCashFlow("week")).rejects.toThrow(
+      "Database connection failed",
+    );
+  });
+});
+
+describe("getRecentTransactions", () => {
+  it("returns 5 most recent with mapped fields", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+
+    mockFindMany.mockResolvedValue([
+      {
+        id: "txn-1",
+        amount: 150,
+        description: "Freelance payment",
+        date: new Date("2024-06-15"),
+        category: { name: "Salary" },
+      },
+      {
+        id: "txn-2",
+        amount: -45,
+        description: "Groceries",
+        date: new Date("2024-06-14"),
+        category: { name: "Food" },
+      },
+      {
+        id: "txn-3",
+        amount: -30,
+        description: null,
+        date: new Date("2024-06-13"),
+        category: { name: "Transport" },
+      },
+    ]);
+
+    const result = await getRecentTransactions();
+
+    expect(result).toEqual([
+      {
+        id: "txn-1",
+        amount: 150,
+        description: "Freelance payment",
+        date: "2024-06-15",
+        categoryName: "Salary",
+      },
+      {
+        id: "txn-2",
+        amount: -45,
+        description: "Groceries",
+        date: "2024-06-14",
+        categoryName: "Food",
+      },
+      {
+        id: "txn-3",
+        amount: -30,
+        description: null,
+        date: "2024-06-13",
+        categoryName: "Transport",
+      },
+    ]);
+
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      orderBy: { date: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        amount: true,
+        description: true,
+        date: true,
+        category: { select: { name: true } },
+      },
+    });
+  });
+
+  it("throws Unauthorized when no session", async () => {
+    mockAuth.mockResolvedValue(null);
+
+    await expect(getRecentTransactions()).rejects.toThrow("Unauthorized");
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it("returns empty array when no transactions", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue([]);
+
+    const result = await getRecentTransactions();
+
+    expect(result).toEqual([]);
+  });
+
+  it("maps Decimal amount to number and formats date", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue([
+      {
+        id: "txn-1",
+        amount: { valueOf: () => 99.5 },
+        description: null,
+        date: new Date("2024-06-15"),
+        category: { name: "Food" },
+      },
+    ]);
+
+    const result = await getRecentTransactions();
+
+    expect(result[0].amount).toBe(99.5);
+    expect(result[0].date).toBe("2024-06-15");
+  });
+
+  it("propagates Prisma errors", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    const error = new Error("Database connection failed");
+    mockFindMany.mockRejectedValue(error);
+
+    await expect(getRecentTransactions()).rejects.toThrow(
       "Database connection failed",
     );
   });
