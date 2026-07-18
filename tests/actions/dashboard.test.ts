@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
+import { Prisma } from "@/generated/prisma/client";
 import {
   getDashboardSummary,
   getExpensesByCategory,
@@ -43,19 +44,22 @@ describe("getDashboardSummary", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
     const allData = [
-      { amount: 200 },
-      { amount: -50 },
-      { amount: 100 },
-      { amount: -30 },
-      { amount: 75 },
+      { amount: new Prisma.Decimal(200) },
+      { amount: new Prisma.Decimal(-50) },
+      { amount: new Prisma.Decimal(100) },
+      { amount: new Prisma.Decimal(-30) },
+      { amount: new Prisma.Decimal(75) },
     ];
-    const weekData = [{ amount: 100 }, { amount: -30 }];
+    const weekData = [
+      { amount: new Prisma.Decimal(100) },
+      { amount: new Prisma.Decimal(-30) },
+    ];
     const monthData = [
-      { amount: 200 },
-      { amount: -50 },
-      { amount: 100 },
-      { amount: -30 },
-      { amount: 75 },
+      { amount: new Prisma.Decimal(200) },
+      { amount: new Prisma.Decimal(-50) },
+      { amount: new Prisma.Decimal(100) },
+      { amount: new Prisma.Decimal(-30) },
+      { amount: new Prisma.Decimal(75) },
     ];
 
     mockFindMany
@@ -117,15 +121,15 @@ describe("getDashboardSummary", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany
       .mockResolvedValueOnce([
-        { amount: { valueOf: () => 42.5 } },
-        { amount: { valueOf: () => -15.3 } },
-        { amount: { valueOf: () => 7.2 } },
+        { amount: new Prisma.Decimal(42.5) },
+        { amount: new Prisma.Decimal(-15.3) },
+        { amount: new Prisma.Decimal(7.2) },
       ])
-      .mockResolvedValueOnce([{ amount: { valueOf: () => 42.5 } }])
+      .mockResolvedValueOnce([{ amount: new Prisma.Decimal(42.5) }])
       .mockResolvedValueOnce([
-        { amount: { valueOf: () => 42.5 } },
-        { amount: { valueOf: () => -15.3 } },
-        { amount: { valueOf: () => 7.2 } },
+        { amount: new Prisma.Decimal(42.5) },
+        { amount: new Prisma.Decimal(-15.3) },
+        { amount: new Prisma.Decimal(7.2) },
       ]);
 
     const result = await getDashboardSummary();
@@ -144,11 +148,11 @@ describe("getDashboardSummary", () => {
     mockFindMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
-        { amount: 50 },
-        { amount: 100 },
-        { amount: 25 },
-        { amount: -10 },
-        { amount: -40 },
+        { amount: new Prisma.Decimal(50) },
+        { amount: new Prisma.Decimal(100) },
+        { amount: new Prisma.Decimal(25) },
+        { amount: new Prisma.Decimal(-10) },
+        { amount: new Prisma.Decimal(-40) },
       ])
       .mockResolvedValueOnce([]);
 
@@ -181,10 +185,10 @@ describe("getExpensesByCategory", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
     mockFindMany.mockResolvedValue([
-      { amount: -50, category: { name: "Food" } },
-      { amount: -30, category: { name: "Transport" } },
-      { amount: -20, category: { name: "Food" } },
-      { amount: -100, category: { name: "Entertainment" } },
+      { amount: new Prisma.Decimal(-50), category: { name: "Food" } },
+      { amount: new Prisma.Decimal(-30), category: { name: "Transport" } },
+      { amount: new Prisma.Decimal(-20), category: { name: "Food" } },
+      { amount: new Prisma.Decimal(-100), category: { name: "Entertainment" } },
     ]);
 
     const result = await getExpensesByCategory("month");
@@ -266,9 +270,9 @@ describe("getCashFlow", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
     mockFindMany.mockResolvedValue([
-      { amount: 100, date: new Date("2024-06-12") },
-      { amount: -50, date: new Date("2024-06-14") },
-      { amount: 30, date: new Date("2024-06-14") },
+      { amount: new Prisma.Decimal(100), date: new Date("2024-06-12") },
+      { amount: new Prisma.Decimal(-50), date: new Date("2024-06-14") },
+      { amount: new Prisma.Decimal(30), date: new Date("2024-06-14") },
     ]);
 
     const result = await getCashFlow("week");
@@ -317,8 +321,8 @@ describe("getCashFlow", () => {
 
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([
-      { amount: 50, date: new Date("2024-06-10") },
-      { amount: 50, date: new Date("2024-06-15") },
+      { amount: new Prisma.Decimal(50), date: new Date("2024-06-10") },
+      { amount: new Prisma.Decimal(50), date: new Date("2024-06-15") },
     ]);
 
     const result = await getCashFlow("week");

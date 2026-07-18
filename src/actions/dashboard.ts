@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 
@@ -56,18 +57,24 @@ export async function getDashboardSummary(): Promise<SummaryData> {
       }),
     ]);
 
-  const toNum = (t: { amount: unknown }) => Number(t.amount);
+  const zero = new Prisma.Decimal(0);
 
   const weekIncome = weekTransactions
-    .filter((t) => Number(t.amount) > 0)
-    .reduce((s, t) => s + toNum(t), 0);
+    .filter((t) => t.amount.gt(0))
+    .reduce((s, t) => s.plus(t.amount), zero)
+    .toNumber();
   const weekExpense = weekTransactions
-    .filter((t) => Number(t.amount) < 0)
-    .reduce((s, t) => s + toNum(t), 0);
+    .filter((t) => t.amount.lt(0))
+    .reduce((s, t) => s.plus(t.amount), zero)
+    .toNumber();
 
-  const netBalance = allTransactions.reduce((s, t) => s + toNum(t), 0);
+  const netBalance = allTransactions
+    .reduce((s, t) => s.plus(t.amount), zero)
+    .toNumber();
 
-  const monthNetFlow = monthTransactions.reduce((s, t) => s + toNum(t), 0);
+  const monthNetFlow = monthTransactions
+    .reduce((s, t) => s.plus(t.amount), zero)
+    .toNumber();
 
   return { weekIncome, weekExpense, netBalance, monthNetFlow };
 }
@@ -102,14 +109,14 @@ export async function getExpensesByCategory(
     select: { amount: true, category: { select: { name: true } } },
   });
 
-  const grouped: Record<string, number> = {};
+  const grouped: Record<string, Prisma.Decimal> = {};
   for (const e of expenses) {
     const name = e.category.name;
-    grouped[name] = (grouped[name] || 0) + Number(e.amount);
+    grouped[name] = (grouped[name] || new Prisma.Decimal(0)).plus(e.amount);
   }
 
   return Object.entries(grouped)
-    .map(([categoryName, total]) => ({ categoryName, total }))
+    .map(([categoryName, total]) => ({ categoryName, total: total.toNumber() }))
     .sort((a, b) => a.total - b.total);
 }
 
@@ -131,19 +138,19 @@ export async function getCashFlow(
     select: { amount: true, date: true },
   });
 
-  const dailyMap: Record<string, number> = {};
+  const dailyMap: Record<string, Prisma.Decimal> = {};
   for (const t of transactions) {
     const key = dayjs(t.date).format("YYYY-MM-DD");
-    dailyMap[key] = (dailyMap[key] || 0) + Number(t.amount);
+    dailyMap[key] = (dailyMap[key] || new Prisma.Decimal(0)).plus(t.amount);
   }
 
-  let cumulative = 0;
+  let cumulative = new Prisma.Decimal(0);
   const result: CashFlowPoint[] = [];
   let cursor = startDate.clone();
   while (cursor.isBefore(now.add(1, "day"))) {
     const key = cursor.format("YYYY-MM-DD");
-    cumulative += dailyMap[key] || 0;
-    result.push({ date: key, balance: cumulative });
+    cumulative = cumulative.plus(dailyMap[key] || new Prisma.Decimal(0));
+    result.push({ date: key, balance: cumulative.toNumber() });
     cursor = cursor.add(1, "day");
   }
 
