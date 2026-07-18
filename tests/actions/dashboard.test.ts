@@ -356,21 +356,21 @@ describe("getRecentTransactions", () => {
     mockFindMany.mockResolvedValue([
       {
         id: "txn-1",
-        amount: 150,
+        amount: new Prisma.Decimal(150),
         description: "Freelance payment",
         date: new Date("2024-06-15"),
         category: { name: "Salary" },
       },
       {
         id: "txn-2",
-        amount: -45,
+        amount: new Prisma.Decimal(-45),
         description: "Groceries",
         date: new Date("2024-06-14"),
         category: { name: "Food" },
       },
       {
         id: "txn-3",
-        amount: -30,
+        amount: new Prisma.Decimal(-30),
         description: null,
         date: new Date("2024-06-13"),
         category: { name: "Transport" },
@@ -438,7 +438,7 @@ describe("getRecentTransactions", () => {
     mockFindMany.mockResolvedValue([
       {
         id: "txn-1",
-        amount: { valueOf: () => 99.5 },
+        amount: new Prisma.Decimal(99.5),
         description: null,
         date: new Date("2024-06-15"),
         category: { name: "Food" },

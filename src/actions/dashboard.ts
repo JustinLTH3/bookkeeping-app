@@ -176,7 +176,7 @@ export async function getRecentTransactions(): Promise<RecentTransaction[]> {
 
   return transactions.map((t) => ({
     id: t.id,
-    amount: Number(t.amount),
+    amount: t.amount.toNumber(),
     description: t.description,
     date: dayjs(t.date).format("YYYY-MM-DD"),
     categoryName: t.category.name,
