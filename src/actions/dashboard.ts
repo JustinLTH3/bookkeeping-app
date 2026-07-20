@@ -65,8 +65,9 @@ function getEndDate(
     case "quarterly":
       return endOfQuarter(now).startOf("day");
     case "yearly":
-    case "ytd":
       return now.endOf("year").startOf("day");
+    case "ytd":
+      return now.startOf("day");
   }
 }
 

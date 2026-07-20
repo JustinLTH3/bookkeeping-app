@@ -31,8 +31,8 @@ type Props = {
 };
 
 export function LineChart({ data }: Props) {
-  const futureIndex = data.findIndex((d) => d.isFuture);
-  const hasFuture = futureIndex >= 0;
+  let futureIndex = data.findIndex((d) => d.isFuture);
+  if (futureIndex < 0) futureIndex = data.length;
 
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
@@ -53,18 +53,16 @@ export function LineChart({ data }: Props) {
         tension: 0.3,
         pointRadius: 0,
         borderWidth: 2,
-        ...(hasFuture && {
-          segment: {
-            borderColor: (ctx: { p1DataIndex: number }) =>
-              ctx.p1DataIndex >= futureIndex ? "#d1d5db" : "#10b981",
-            backgroundColor: (ctx: { p1DataIndex: number }) =>
-              ctx.p1DataIndex >= futureIndex
-                ? "rgba(209, 213, 219, 0.15)"
-                : "rgba(16, 185, 129, 0.1)",
-            borderDash: (ctx: { p1DataIndex: number }) =>
-              ctx.p1DataIndex >= futureIndex ? [4, 4] : [],
-          },
-        }),
+        segment: {
+          borderColor: (ctx: { p1DataIndex: number }) =>
+            ctx.p1DataIndex >= futureIndex ? "#d1d5db" : "#10b981",
+          backgroundColor: (ctx: { p1DataIndex: number }) =>
+            ctx.p1DataIndex >= futureIndex
+              ? "rgba(209, 213, 219, 0.15)"
+              : "rgba(16, 185, 129, 0.1)",
+          borderDash: (ctx: { p1DataIndex: number }) =>
+            ctx.p1DataIndex >= futureIndex ? [4, 4] : [],
+        },
       },
     ],
   };
@@ -76,6 +74,7 @@ export function LineChart({ data }: Props) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
+          legend: { display: false },
           tooltip: {
             callbacks: {
               label: (ctx) => {
