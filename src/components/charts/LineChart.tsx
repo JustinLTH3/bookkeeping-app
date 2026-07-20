@@ -35,12 +35,7 @@ export function LineChart({ data }: Props) {
   let futureIndex = data.findIndex((p) => p.date == todayStr);
   if (futureIndex < 0) futureIndex = data.length;
 
-  const formatDate = (d: string) => {
-    const date = new Date(d + "T00:00:00");
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  };
-
-  const labels = data.map((d) => formatDate(d.date));
+  const labels = data.map((d) => dayjs(d.date).format("MMM D"));
   const values = data.map((d) => d.balance);
 
   const chartData = {
