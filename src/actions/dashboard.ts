@@ -24,7 +24,6 @@ export type CategoryExpense = {
 export type CashFlowPoint = {
   date: string;
   balance: number;
-  isFuture: boolean;
 };
 
 export type RecentTransaction = {
@@ -197,13 +196,10 @@ export async function getCashFlow(
   const result: CashFlowPoint[] = [];
   let cursor = startDate.clone();
   const endDate = getEndDate(timeRange);
-  const today = dayjs().format("YYYY-MM-DD");
-
   while (cursor.isBefore(endDate.add(1, "day"))) {
     const key = cursor.format("YYYY-MM-DD");
     cumulative = cumulative.plus(dailyMap[key] || new Prisma.Decimal(0));
-    const isFuture = key > today;
-    result.push({ date: key, balance: cumulative.toNumber(), isFuture });
+    result.push({ date: key, balance: cumulative.toNumber() });
     cursor = cursor.add(1, "day");
   }
 

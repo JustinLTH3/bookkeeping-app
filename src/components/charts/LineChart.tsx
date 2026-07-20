@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
+import dayjs from "dayjs";
 
 ChartJS.register(
   CategoryScale,
@@ -23,7 +24,6 @@ ChartJS.register(
 type DataPoint = {
   date: string;
   balance: number;
-  isFuture: boolean;
 };
 
 type Props = {
@@ -31,7 +31,8 @@ type Props = {
 };
 
 export function LineChart({ data }: Props) {
-  let futureIndex = data.findIndex((d) => d.isFuture);
+  const todayStr = dayjs().format("YYYY-MM-DD");
+  let futureIndex = data.findIndex((p) => p.date == todayStr);
   if (futureIndex < 0) futureIndex = data.length;
 
   const formatDate = (d: string) => {
@@ -55,13 +56,13 @@ export function LineChart({ data }: Props) {
         borderWidth: 2,
         segment: {
           borderColor: (ctx: { p1DataIndex: number }) =>
-            ctx.p1DataIndex >= futureIndex ? "#d1d5db" : "#10b981",
+            ctx.p1DataIndex > futureIndex ? "#d1d5db" : "#10b981",
           backgroundColor: (ctx: { p1DataIndex: number }) =>
-            ctx.p1DataIndex >= futureIndex
+            ctx.p1DataIndex > futureIndex
               ? "rgba(209, 213, 219, 0.15)"
               : "rgba(16, 185, 129, 0.1)",
           borderDash: (ctx: { p1DataIndex: number }) =>
-            ctx.p1DataIndex >= futureIndex ? [4, 4] : [],
+            ctx.p1DataIndex > futureIndex ? [4, 4] : [],
         },
       },
     ],

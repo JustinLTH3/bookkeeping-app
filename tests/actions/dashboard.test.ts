@@ -280,13 +280,13 @@ describe("getCashFlow", () => {
     const result = await getCashFlow("weekly");
 
     expect(result).toEqual([
-      { date: "2024-06-10", balance: 0, isFuture: false },
-      { date: "2024-06-11", balance: 0, isFuture: false },
-      { date: "2024-06-12", balance: 100, isFuture: false },
-      { date: "2024-06-13", balance: 100, isFuture: false },
-      { date: "2024-06-14", balance: 80, isFuture: false },
-      { date: "2024-06-15", balance: 80, isFuture: false },
-      { date: "2024-06-16", balance: 80, isFuture: true },
+      { date: "2024-06-10", balance: 0 },
+      { date: "2024-06-11", balance: 0 },
+      { date: "2024-06-12", balance: 100 },
+      { date: "2024-06-13", balance: 100 },
+      { date: "2024-06-14", balance: 80 },
+      { date: "2024-06-15", balance: 80 },
+      { date: "2024-06-16", balance: 80 },
     ]);
 
     const expectedStart = dayjs().startOf("isoWeek").toDate();
@@ -315,7 +315,6 @@ describe("getCashFlow", () => {
 
     expect(result).toHaveLength(7);
     expect(result.every((p) => p.balance === 0)).toBe(true);
-    expect(result.filter((p) => p.isFuture)).toHaveLength(1);
   });
 
   it("fills date gaps with previous balance", async () => {
@@ -331,13 +330,13 @@ describe("getCashFlow", () => {
     const result = await getCashFlow("weekly");
 
     expect(result).toEqual([
-      { date: "2024-06-10", balance: 50, isFuture: false },
-      { date: "2024-06-11", balance: 50, isFuture: false },
-      { date: "2024-06-12", balance: 50, isFuture: false },
-      { date: "2024-06-13", balance: 50, isFuture: false },
-      { date: "2024-06-14", balance: 50, isFuture: false },
-      { date: "2024-06-15", balance: 100, isFuture: false },
-      { date: "2024-06-16", balance: 100, isFuture: true },
+      { date: "2024-06-10", balance: 50 },
+      { date: "2024-06-11", balance: 50 },
+      { date: "2024-06-12", balance: 50 },
+      { date: "2024-06-13", balance: 50 },
+      { date: "2024-06-14", balance: 50 },
+      { date: "2024-06-15", balance: 100 },
+      { date: "2024-06-16", balance: 100 },
     ]);
   });
 
