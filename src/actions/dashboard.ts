@@ -12,7 +12,8 @@ export type SummaryData = {
   weekIncome: number;
   weekExpense: number;
   netBalance: number;
-  monthNetFlow: number;
+  periodNetFlow: number;
+  periodLabel: string;
 };
 
 export type CategoryExpense = {
@@ -23,6 +24,7 @@ export type CategoryExpense = {
 export type CashFlowPoint = {
   date: string;
   balance: number;
+  isFuture: boolean;
 };
 
 export type RecentTransaction = {
@@ -33,15 +35,52 @@ export type RecentTransaction = {
   categoryName: string;
 };
 
-export async function getDashboardSummary(): Promise<SummaryData> {
+const PERIOD_LABELS: Record<string, string> = {
+  weekly: "Weekly",
+  monthly: "Monthly",
+  quarterly: "Quarterly",
+  yearly: "Yearly",
+  ytd: "Year to Date",
+};
+
+function startOfQuarter(d: dayjs.Dayjs) {
+  const q = Math.floor(d.month() / 3);
+  return d.month(q * 3).startOf("month");
+}
+
+function endOfQuarter(d: dayjs.Dayjs) {
+  const q = Math.floor(d.month() / 3);
+  return d.month(q * 3 + 2).endOf("month");
+}
+
+function getEndDate(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+) {
+  const now = dayjs();
+  switch (timeRange) {
+    case "weekly":
+      return now.endOf("isoWeek").startOf("day");
+    case "monthly":
+      return now.endOf("month").startOf("day");
+    case "quarterly":
+      return endOfQuarter(now).startOf("day");
+    case "yearly":
+    case "ytd":
+      return now.endOf("year").startOf("day");
+  }
+}
+
+export async function getDashboardSummary(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+): Promise<SummaryData> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const now = dayjs();
   const weekStart = now.startOf("isoWeek").toDate();
-  const monthStart = now.startOf("month").toDate();
+  const periodStart = getStartDate(timeRange).toDate();
 
-  const [allTransactions, weekTransactions, monthTransactions] =
+  const [allTransactions, weekTransactions, periodTransactions] =
     await Promise.all([
       prisma.transaction.findMany({
         where: { userId: session.user.id },
@@ -52,7 +91,7 @@ export async function getDashboardSummary(): Promise<SummaryData> {
         select: { amount: true },
       }),
       prisma.transaction.findMany({
-        where: { userId: session.user.id, date: { gte: monthStart } },
+        where: { userId: session.user.id, date: { gte: periodStart } },
         select: { amount: true },
       }),
     ]);
@@ -72,28 +111,38 @@ export async function getDashboardSummary(): Promise<SummaryData> {
     .reduce((s, t) => s.plus(t.amount), zero)
     .toNumber();
 
-  const monthNetFlow = monthTransactions
+  const periodNetFlow = periodTransactions
     .reduce((s, t) => s.plus(t.amount), zero)
     .toNumber();
 
-  return { weekIncome, weekExpense, netBalance, monthNetFlow };
+  return {
+    weekIncome,
+    weekExpense,
+    netBalance,
+    periodNetFlow,
+    periodLabel: PERIOD_LABELS[timeRange],
+  };
 }
 
-function getStartDate(timeRange: "week" | "month" | "year" | "ytd") {
+function getStartDate(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+) {
   const now = dayjs();
   switch (timeRange) {
-    case "week":
+    case "weekly":
       return now.startOf("isoWeek");
-    case "month":
+    case "monthly":
       return now.startOf("month");
-    case "year":
+    case "quarterly":
+      return startOfQuarter(now);
+    case "yearly":
     case "ytd":
       return now.startOf("year");
   }
 }
 
 export async function getExpensesByCategory(
-  timeRange: "week" | "month" | "year" | "ytd" = "month",
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
 ): Promise<CategoryExpense[]> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -121,12 +170,11 @@ export async function getExpensesByCategory(
 }
 
 export async function getCashFlow(
-  timeRange: "week" | "month" | "year" | "ytd",
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
 ): Promise<CashFlowPoint[]> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const now = dayjs();
   const startDate = getStartDate(timeRange);
 
   const transactions = await prisma.transaction.findMany({
@@ -147,10 +195,14 @@ export async function getCashFlow(
   let cumulative = new Prisma.Decimal(0);
   const result: CashFlowPoint[] = [];
   let cursor = startDate.clone();
-  while (cursor.isBefore(now.add(1, "day"))) {
+  const endDate = getEndDate(timeRange);
+  const today = dayjs().format("YYYY-MM-DD");
+
+  while (cursor.isBefore(endDate.add(1, "day"))) {
     const key = cursor.format("YYYY-MM-DD");
     cumulative = cumulative.plus(dailyMap[key] || new Prisma.Decimal(0));
-    result.push({ date: key, balance: cumulative.toNumber() });
+    const isFuture = key > today;
+    result.push({ date: key, balance: cumulative.toNumber(), isFuture });
     cursor = cursor.add(1, "day");
   }
 

@@ -20,11 +20,20 @@ ChartJS.register(
   Tooltip,
 );
 
+type DataPoint = {
+  date: string;
+  balance: number;
+  isFuture: boolean;
+};
+
 type Props = {
-  data: { date: string; balance: number }[];
+  data: DataPoint[];
 };
 
 export function LineChart({ data }: Props) {
+  const futureIndex = data.findIndex((d) => d.isFuture);
+  const hasFuture = futureIndex >= 0;
+
   const formatDate = (d: string) => {
     const date = new Date(d + "T00:00:00");
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -44,6 +53,18 @@ export function LineChart({ data }: Props) {
         tension: 0.3,
         pointRadius: 0,
         borderWidth: 2,
+        ...(hasFuture && {
+          segment: {
+            borderColor: (ctx: { p1DataIndex: number }) =>
+              ctx.p1DataIndex >= futureIndex ? "#d1d5db" : "#10b981",
+            backgroundColor: (ctx: { p1DataIndex: number }) =>
+              ctx.p1DataIndex >= futureIndex
+                ? "rgba(209, 213, 219, 0.15)"
+                : "rgba(16, 185, 129, 0.1)",
+            borderDash: (ctx: { p1DataIndex: number }) =>
+              ctx.p1DataIndex >= futureIndex ? [4, 4] : [],
+          },
+        }),
       },
     ],
   };

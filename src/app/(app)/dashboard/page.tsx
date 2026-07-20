@@ -19,10 +19,11 @@ import type {
 } from "@/actions/dashboard";
 
 const TIME_RANGES = [
-  { value: "week", label: "This Week" },
-  { value: "month", label: "This Month" },
-  { value: "year", label: "This Year" },
-  { value: "ytd", label: "YTD" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+  { value: "ytd", label: "Year to Date" },
 ] as const;
 
 function formatCurrency(value: number) {
@@ -38,53 +39,30 @@ export default function DashboardPage() {
   const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
   const [recentTxns, setRecentTxns] = useState<RecentTransaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pieTimeRange, setPieTimeRange] = useState<
-    "week" | "month" | "year" | "ytd"
-  >("month");
-  const [timeRange, setTimeRange] = useState<"week" | "month" | "year" | "ytd">(
-    "month",
-  );
+  const [timeRange, setTimeRange] = useState<
+    "weekly" | "monthly" | "quarterly" | "yearly" | "ytd"
+  >("monthly");
 
   useEffect(() => {
     async function load() {
       try {
-        const [s, r] = await Promise.all([
-          getDashboardSummary(),
+        const [s, r, p, cf] = await Promise.all([
+          getDashboardSummary(timeRange),
           getRecentTransactions(),
+          getExpensesByCategory(timeRange),
+          getCashFlow(timeRange),
         ]);
         setSummary(s);
         setRecentTxns(r);
+        setPieData(p);
+        setCashFlow(cf);
       } catch {
-        // keep empty state
+        // keep empty
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, []);
-
-  useEffect(() => {
-    async function loadPie() {
-      try {
-        const p = await getExpensesByCategory(pieTimeRange);
-        setPieData(p);
-      } catch {
-        // keep empty
-      }
-    }
-    loadPie();
-  }, [pieTimeRange]);
-
-  useEffect(() => {
-    async function loadCashFlow() {
-      try {
-        const cf = await getCashFlow(timeRange);
-        setCashFlow(cf);
-      } catch {
-        // keep empty
-      }
-    }
-    loadCashFlow();
   }, [timeRange]);
 
   if (loading) {
@@ -97,9 +75,27 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-8 py-10">
-      <h1 className="text-primary text-3xl font-semibold tracking-tight">
-        Dashboard
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-primary text-3xl font-semibold tracking-tight">
+          Dashboard
+        </h1>
+        <select
+          value={timeRange}
+          onChange={(e) =>
+            setTimeRange(
+              e.target.value as
+                "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+            )
+          }
+          className="rounded-md border border-primary/10 px-3 py-1.5 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
+        >
+          {TIME_RANGES.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,15 +133,15 @@ export default function DashboardPage() {
           )}
         </SummaryCard>
 
-        <SummaryCard title="This Month Net Flow">
+        <SummaryCard title={`${summary?.periodLabel ?? "This Month"} Net Flow`}>
           {summary && (
             <p
               className={`text-2xl font-semibold tabular-nums ${
-                summary.monthNetFlow >= 0 ? "text-secondary" : "text-red-600"
+                summary.periodNetFlow >= 0 ? "text-secondary" : "text-red-600"
               }`}
             >
-              {summary.monthNetFlow >= 0 ? "+" : "-"}
-              {formatCurrency(summary.monthNetFlow)}
+              {summary.periodNetFlow >= 0 ? "+" : "-"}
+              {formatCurrency(summary.periodNetFlow)}
             </p>
           )}
         </SummaryCard>
@@ -155,25 +151,10 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Pie Chart */}
         <div className="rounded-lg border border-primary/10 bg-white p-6 lg:col-span-1">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4">
             <h2 className="text-primary text-lg font-semibold">
               Expenses by Category
             </h2>
-            <select
-              value={pieTimeRange}
-              onChange={(e) =>
-                setPieTimeRange(
-                  e.target.value as "week" | "month" | "year" | "ytd",
-                )
-              }
-              className="rounded-md border border-primary/10 px-3 py-1.5 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
-            >
-              {TIME_RANGES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
           </div>
           {pieData.length > 0 ? (
             <PieChart data={pieData} />
@@ -186,23 +167,8 @@ export default function DashboardPage() {
 
         {/* Line Chart */}
         <div className="rounded-lg border border-primary/10 bg-white p-6 lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4">
             <h2 className="text-primary text-lg font-semibold">Cash Flow</h2>
-            <select
-              value={timeRange}
-              onChange={(e) =>
-                setTimeRange(
-                  e.target.value as "week" | "month" | "year" | "ytd",
-                )
-              }
-              className="rounded-md border border-primary/10 px-3 py-1.5 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
-            >
-              {TIME_RANGES.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
           </div>
           {cashFlow.length > 0 ? (
             <div className="h-64">

@@ -73,7 +73,8 @@ describe("getDashboardSummary", () => {
       weekIncome: 100,
       weekExpense: -30,
       netBalance: 295,
-      monthNetFlow: 295,
+      periodNetFlow: 295,
+      periodLabel: "Monthly",
     });
 
     expect(mockFindMany).toHaveBeenNthCalledWith(1, {
@@ -81,14 +82,14 @@ describe("getDashboardSummary", () => {
       select: { amount: true },
     });
     const expectedWeekStart = dayjs().startOf("isoWeek").toDate();
-    const expectedMonthStart = dayjs().startOf("month").toDate();
+    const expectedPeriodStart = dayjs().startOf("month").toDate();
 
     expect(mockFindMany).toHaveBeenNthCalledWith(2, {
       where: { userId: "user-1", date: { gte: expectedWeekStart } },
       select: { amount: true },
     });
     expect(mockFindMany).toHaveBeenNthCalledWith(3, {
-      where: { userId: "user-1", date: { gte: expectedMonthStart } },
+      where: { userId: "user-1", date: { gte: expectedPeriodStart } },
       select: { amount: true },
     });
   });
@@ -110,7 +111,8 @@ describe("getDashboardSummary", () => {
       weekIncome: 0,
       weekExpense: 0,
       netBalance: 0,
-      monthNetFlow: 0,
+      periodNetFlow: 0,
+      periodLabel: "Monthly",
     });
   });
 
@@ -137,7 +139,7 @@ describe("getDashboardSummary", () => {
     expect(result.weekIncome).toBe(42.5);
     expect(result.weekExpense).toBe(0);
     expect(result.netBalance).toBe(34.4);
-    expect(result.monthNetFlow).toBe(34.4);
+    expect(result.periodNetFlow).toBe(34.4);
   });
 
   it("correctly filters week income and expense by sign", async () => {
@@ -191,7 +193,7 @@ describe("getExpensesByCategory", () => {
       { amount: new Prisma.Decimal(-100), category: { name: "Entertainment" } },
     ]);
 
-    const result = await getExpensesByCategory("month");
+    const result = await getExpensesByCategory("monthly");
 
     expect(result).toEqual([
       { categoryName: "Entertainment", total: -100 },
@@ -213,7 +215,7 @@ describe("getExpensesByCategory", () => {
   it("throws Unauthorized when no session", async () => {
     mockAuth.mockResolvedValue(null);
 
-    await expect(getExpensesByCategory("month")).rejects.toThrow(
+    await expect(getExpensesByCategory("monthly")).rejects.toThrow(
       "Unauthorized",
     );
     expect(mockFindMany).not.toHaveBeenCalled();
@@ -223,7 +225,7 @@ describe("getExpensesByCategory", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([]);
 
-    const result = await getExpensesByCategory("month");
+    const result = await getExpensesByCategory("monthly");
 
     expect(result).toEqual([]);
   });
@@ -252,7 +254,7 @@ describe("getExpensesByCategory", () => {
     const error = new Error("Database connection failed");
     mockFindMany.mockRejectedValue(error);
 
-    await expect(getExpensesByCategory("month")).rejects.toThrow(
+    await expect(getExpensesByCategory("monthly")).rejects.toThrow(
       "Database connection failed",
     );
   });
@@ -275,16 +277,16 @@ describe("getCashFlow", () => {
       { amount: new Prisma.Decimal(30), date: new Date("2024-06-14") },
     ]);
 
-    const result = await getCashFlow("week");
+    const result = await getCashFlow("weekly");
 
     expect(result).toEqual([
-      { date: "2024-06-10", balance: 0 },
-      { date: "2024-06-11", balance: 0 },
-      { date: "2024-06-12", balance: 100 },
-      { date: "2024-06-13", balance: 100 },
-      { date: "2024-06-14", balance: 80 },
-      { date: "2024-06-15", balance: 80 },
-      { date: "2024-06-16", balance: 80 },
+      { date: "2024-06-10", balance: 0, isFuture: false },
+      { date: "2024-06-11", balance: 0, isFuture: false },
+      { date: "2024-06-12", balance: 100, isFuture: false },
+      { date: "2024-06-13", balance: 100, isFuture: false },
+      { date: "2024-06-14", balance: 80, isFuture: false },
+      { date: "2024-06-15", balance: 80, isFuture: false },
+      { date: "2024-06-16", balance: 80, isFuture: true },
     ]);
 
     const expectedStart = dayjs().startOf("isoWeek").toDate();
@@ -298,7 +300,7 @@ describe("getCashFlow", () => {
   it("throws Unauthorized when no session", async () => {
     mockAuth.mockResolvedValue(null);
 
-    await expect(getCashFlow("week")).rejects.toThrow("Unauthorized");
+    await expect(getCashFlow("weekly")).rejects.toThrow("Unauthorized");
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
@@ -309,10 +311,11 @@ describe("getCashFlow", () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([]);
 
-    const result = await getCashFlow("week");
+    const result = await getCashFlow("weekly");
 
     expect(result).toHaveLength(7);
     expect(result.every((p) => p.balance === 0)).toBe(true);
+    expect(result.filter((p) => p.isFuture)).toHaveLength(1);
   });
 
   it("fills date gaps with previous balance", async () => {
@@ -325,16 +328,16 @@ describe("getCashFlow", () => {
       { amount: new Prisma.Decimal(50), date: new Date("2024-06-15") },
     ]);
 
-    const result = await getCashFlow("week");
+    const result = await getCashFlow("weekly");
 
     expect(result).toEqual([
-      { date: "2024-06-10", balance: 50 },
-      { date: "2024-06-11", balance: 50 },
-      { date: "2024-06-12", balance: 50 },
-      { date: "2024-06-13", balance: 50 },
-      { date: "2024-06-14", balance: 50 },
-      { date: "2024-06-15", balance: 100 },
-      { date: "2024-06-16", balance: 100 },
+      { date: "2024-06-10", balance: 50, isFuture: false },
+      { date: "2024-06-11", balance: 50, isFuture: false },
+      { date: "2024-06-12", balance: 50, isFuture: false },
+      { date: "2024-06-13", balance: 50, isFuture: false },
+      { date: "2024-06-14", balance: 50, isFuture: false },
+      { date: "2024-06-15", balance: 100, isFuture: false },
+      { date: "2024-06-16", balance: 100, isFuture: true },
     ]);
   });
 
@@ -343,7 +346,7 @@ describe("getCashFlow", () => {
     const error = new Error("Database connection failed");
     mockFindMany.mockRejectedValue(error);
 
-    await expect(getCashFlow("week")).rejects.toThrow(
+    await expect(getCashFlow("weekly")).rejects.toThrow(
       "Database connection failed",
     );
   });

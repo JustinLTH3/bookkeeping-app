@@ -31,12 +31,12 @@
 
 ## Complete (cont.)
 
-| Feature             | Details                                                                                                                                                                                                    |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transaction Actions | `getTransactions`, `createTransaction` wired; test coverage for all 4 actions in `tests/actions/transactions.test.ts`                                                                                      |
-| Dashboard           | Summary cards (week income/expense, net balance, month net flow) + PieChart (expenses by category) + LineChart (cash flow with time range dropdown) + recent transactions table with link to /transactions |
-| Chart Components    | `src/components/charts/PieChart.tsx`, `src/components/charts/LineChart.tsx` using Chart.js + react-chartjs-2                                                                                               |
-| Dashboard Actions   | `src/actions/dashboard.ts` — `getDashboardSummary`, `getMonthlyExpensesByCategory`, `getCashFlow`, `getRecentTransactions`                                                                                 |
+| Feature             | Details                                                                                                                                                                                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transaction Actions | `getTransactions`, `createTransaction` wired; test coverage for all 4 actions in `tests/actions/transactions.test.ts`                                                                                                                                           |
+| Dashboard           | Summary cards (week income/expense, net balance, dynamic period net flow) + unified Weekly/Monthly/Quarterly/Yearly/YTD time range selector at heading level controls both charts + PieChart + LineChart + recent transactions table with link to /transactions |
+| Chart Components    | `src/components/charts/PieChart.tsx`, `src/components/charts/LineChart.tsx` using Chart.js + react-chartjs-2; LineChart shows future dates greyed out with dashed line                                                                                          |
+| Dashboard Actions   | `src/actions/dashboard.ts` — `getDashboardSummary`, `getMonthlyExpensesByCategory`, `getCashFlow`, `getRecentTransactions`                                                                                                                                      |
 
 ## Not Started
 
