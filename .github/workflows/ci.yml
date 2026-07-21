@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    name: Lint & TypeCheck & Build
+  Tests:
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,15 +25,4 @@ jobs:
           AUTH_GOOGLE_ID: dummy
           AUTH_GOOGLE_SECRET: dummy
           DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
       - run: npm test
