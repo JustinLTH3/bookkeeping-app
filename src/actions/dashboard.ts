@@ -70,12 +70,10 @@ function getEndDate(
   }
 }
 
-export async function getDashboardSummary(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+async function _getDashboardSummary(
+  userId: string,
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
 ): Promise<SummaryData> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
   const now = dayjs();
   const weekStart = now.startOf("isoWeek").toDate();
   const periodStart = getStartDate(timeRange).toDate();
@@ -83,15 +81,15 @@ export async function getDashboardSummary(
   const [allTransactions, weekTransactions, periodTransactions] =
     await Promise.all([
       prisma.transaction.findMany({
-        where: { userId: session.user.id },
+        where: { userId },
         select: { amount: true },
       }),
       prisma.transaction.findMany({
-        where: { userId: session.user.id, date: { gte: weekStart } },
+        where: { userId, date: { gte: weekStart } },
         select: { amount: true },
       }),
       prisma.transaction.findMany({
-        where: { userId: session.user.id, date: { gte: periodStart } },
+        where: { userId, date: { gte: periodStart } },
         select: { amount: true },
       }),
     ]);
@@ -124,6 +122,14 @@ export async function getDashboardSummary(
   };
 }
 
+export async function getDashboardSummary(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+): Promise<SummaryData> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  return _getDashboardSummary(session.user.id, timeRange);
+}
+
 function getStartDate(
   timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
 ) {
@@ -141,17 +147,15 @@ function getStartDate(
   }
 }
 
-export async function getExpensesByCategory(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+async function _getExpensesByCategory(
+  userId: string,
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
 ): Promise<CategoryExpense[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
   const startDate = getStartDate(timeRange).toDate();
 
   const expenses = await prisma.transaction.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       date: { gte: startDate },
       amount: { lt: 0 },
     },
@@ -169,17 +173,23 @@ export async function getExpensesByCategory(
     .sort((a, b) => a.total - b.total);
 }
 
-export async function getCashFlow(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
-): Promise<CashFlowPoint[]> {
+export async function getExpensesByCategory(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+): Promise<CategoryExpense[]> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  return _getExpensesByCategory(session.user.id, timeRange);
+}
 
+async function _getCashFlow(
+  userId: string,
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+): Promise<CashFlowPoint[]> {
   const startDate = getStartDate(timeRange);
 
   const transactions = await prisma.transaction.findMany({
     where: {
-      userId: session.user.id,
+      userId,
       date: { gte: startDate.toDate() },
     },
     orderBy: { date: "asc" },
@@ -206,12 +216,19 @@ export async function getCashFlow(
   return result;
 }
 
-export async function getRecentTransactions(): Promise<RecentTransaction[]> {
+export async function getCashFlow(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+): Promise<CashFlowPoint[]> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
+  return _getCashFlow(session.user.id, timeRange);
+}
 
+async function _getRecentTransactions(
+  userId: string,
+): Promise<RecentTransaction[]> {
   const transactions = await prisma.transaction.findMany({
-    where: { userId: session.user.id },
+    where: { userId },
     orderBy: { date: "desc" },
     take: 5,
     select: {
@@ -230,4 +247,36 @@ export async function getRecentTransactions(): Promise<RecentTransaction[]> {
     date: dayjs(t.date).format("YYYY-MM-DD"),
     categoryName: t.category.name,
   }));
+}
+
+export async function getRecentTransactions(): Promise<RecentTransaction[]> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  return _getRecentTransactions(session.user.id);
+}
+
+export type DashboardData = {
+  summary: SummaryData;
+  expensesByCategory: CategoryExpense[];
+  cashFlow: CashFlowPoint[];
+  recentTransactions: RecentTransaction[];
+};
+
+export async function getDashboardData(
+  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+): Promise<DashboardData> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const userId = session.user.id;
+
+  const [summary, expensesByCategory, cashFlow, recentTransactions] =
+    await Promise.all([
+      _getDashboardSummary(userId, timeRange),
+      _getExpensesByCategory(userId, timeRange),
+      _getCashFlow(userId, timeRange),
+      _getRecentTransactions(userId),
+    ]);
+
+  return { summary, expensesByCategory, cashFlow, recentTransactions };
 }
