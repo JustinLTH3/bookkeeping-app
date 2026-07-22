@@ -5,18 +5,8 @@ import Link from "next/link";
 import dayjs from "dayjs";
 import { PieChart } from "@/components/charts/PieChart";
 import { LineChart } from "@/components/charts/LineChart";
-import {
-  getDashboardSummary,
-  getExpensesByCategory,
-  getCashFlow,
-  getRecentTransactions,
-} from "@/actions/dashboard";
-import type {
-  SummaryData,
-  CategoryExpense,
-  CashFlowPoint,
-  RecentTransaction,
-} from "@/actions/dashboard";
+import { getDashboardData } from "@/actions/dashboard";
+import type { DashboardData } from "@/actions/dashboard";
 
 const TIME_RANGES = [
   { value: "weekly", label: "Weekly" },
@@ -34,10 +24,7 @@ function formatCurrency(value: number) {
 }
 
 export default function DashboardPage() {
-  const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [pieData, setPieData] = useState<CategoryExpense[]>([]);
-  const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
-  const [recentTxns, setRecentTxns] = useState<RecentTransaction[]>([]);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<
     "weekly" | "monthly" | "quarterly" | "yearly" | "ytd"
@@ -46,16 +33,8 @@ export default function DashboardPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [s, r, p, cf] = await Promise.all([
-          getDashboardSummary(timeRange),
-          getRecentTransactions(),
-          getExpensesByCategory(timeRange),
-          getCashFlow(timeRange),
-        ]);
-        setSummary(s);
-        setRecentTxns(r);
-        setPieData(p);
-        setCashFlow(cf);
+        const result = await getDashboardData(timeRange);
+        setData(result);
       } catch {
         // keep empty
       } finally {
@@ -101,18 +80,18 @@ export default function DashboardPage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <SummaryCard title="This Week">
           <div className="space-y-2">
-            {summary && (
+            {data?.summary && (
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Income</span>
                   <span className="text-sm font-medium text-secondary">
-                    +{formatCurrency(summary.weekIncome)}
+                    +{formatCurrency(data.summary.weekIncome)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Expense</span>
                   <span className="text-sm font-medium text-red-600">
-                    -{formatCurrency(summary.weekExpense)}
+                    -{formatCurrency(data.summary.weekExpense)}
                   </span>
                 </div>
               </>
@@ -121,27 +100,31 @@ export default function DashboardPage() {
         </SummaryCard>
 
         <SummaryCard title="Net Balance">
-          {summary && (
+          {data?.summary && (
             <p
               className={`text-2xl font-semibold tabular-nums ${
-                summary.netBalance >= 0 ? "text-secondary" : "text-red-600"
+                data.summary.netBalance >= 0 ? "text-secondary" : "text-red-600"
               }`}
             >
-              {summary.netBalance >= 0 ? "+" : "-"}
-              {formatCurrency(summary.netBalance)}
+              {data.summary.netBalance >= 0 ? "+" : "-"}
+              {formatCurrency(data.summary.netBalance)}
             </p>
           )}
         </SummaryCard>
 
-        <SummaryCard title={`${summary?.periodLabel ?? "This Month"} Net Flow`}>
-          {summary && (
+        <SummaryCard
+          title={`${data?.summary.periodLabel ?? "This Month"} Net Flow`}
+        >
+          {data?.summary && (
             <p
               className={`text-2xl font-semibold tabular-nums ${
-                summary.periodNetFlow >= 0 ? "text-secondary" : "text-red-600"
+                data.summary.periodNetFlow >= 0
+                  ? "text-secondary"
+                  : "text-red-600"
               }`}
             >
-              {summary.periodNetFlow >= 0 ? "+" : "-"}
-              {formatCurrency(summary.periodNetFlow)}
+              {data.summary.periodNetFlow >= 0 ? "+" : "-"}
+              {formatCurrency(data.summary.periodNetFlow)}
             </p>
           )}
         </SummaryCard>
@@ -156,8 +139,8 @@ export default function DashboardPage() {
               Expenses by Category
             </h2>
           </div>
-          {pieData.length > 0 ? (
-            <PieChart data={pieData} />
+          {data && data.expensesByCategory.length > 0 ? (
+            <PieChart data={data.expensesByCategory} />
           ) : (
             <p className="py-8 text-center text-sm text-tertiary">
               No expenses for this period
@@ -170,9 +153,9 @@ export default function DashboardPage() {
           <div className="mb-4">
             <h2 className="text-primary text-lg font-semibold">Cash Flow</h2>
           </div>
-          {cashFlow.length > 0 ? (
+          {data && data.cashFlow.length > 0 ? (
             <div className="h-64">
-              <LineChart data={cashFlow} />
+              <LineChart data={data.cashFlow} />
             </div>
           ) : (
             <p className="py-8 text-center text-sm text-tertiary">
@@ -214,8 +197,8 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral">
-              {recentTxns.length > 0 ? (
-                recentTxns.map((t) => {
+              {data && data.recentTransactions.length > 0 ? (
+                data.recentTransactions.map((t) => {
                   const isIncome = t.amount >= 0;
                   return (
                     <tr key={t.id} className="hover:bg-neutral/50">

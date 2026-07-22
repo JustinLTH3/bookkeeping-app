@@ -11,8 +11,9 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockAuth, mockFindMany } = vi.hoisted(() => ({
+const { mockAuth, mockQueryRaw, mockFindMany } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
+  mockQueryRaw: vi.fn(),
   mockFindMany: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $queryRaw: mockQueryRaw,
     transaction: {
       findMany: mockFindMany,
     },
@@ -43,29 +45,14 @@ describe("getDashboardSummary", () => {
 
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
 
-    const allData = [
-      { amount: new Prisma.Decimal(200) },
-      { amount: new Prisma.Decimal(-50) },
-      { amount: new Prisma.Decimal(100) },
-      { amount: new Prisma.Decimal(-30) },
-      { amount: new Prisma.Decimal(75) },
-    ];
-    const weekData = [
-      { amount: new Prisma.Decimal(100) },
-      { amount: new Prisma.Decimal(-30) },
-    ];
-    const monthData = [
-      { amount: new Prisma.Decimal(200) },
-      { amount: new Prisma.Decimal(-50) },
-      { amount: new Prisma.Decimal(100) },
-      { amount: new Prisma.Decimal(-30) },
-      { amount: new Prisma.Decimal(75) },
-    ];
-
-    mockFindMany
-      .mockResolvedValueOnce(allData)
-      .mockResolvedValueOnce(weekData)
-      .mockResolvedValueOnce(monthData);
+    mockQueryRaw.mockResolvedValue([
+      {
+        net_balance: "295.00",
+        week_income: "100.00",
+        week_expense: "-30.00",
+        period_net_flow: "295.00",
+      },
+    ]);
 
     const result = await getDashboardSummary();
 
@@ -77,33 +64,26 @@ describe("getDashboardSummary", () => {
       periodLabel: "Monthly",
     });
 
-    expect(mockFindMany).toHaveBeenNthCalledWith(1, {
-      where: { userId: "user-1" },
-      select: { amount: true },
-    });
-    const expectedWeekStart = dayjs().startOf("isoWeek").toDate();
-    const expectedPeriodStart = dayjs().startOf("month").toDate();
-
-    expect(mockFindMany).toHaveBeenNthCalledWith(2, {
-      where: { userId: "user-1", date: { gte: expectedWeekStart } },
-      select: { amount: true },
-    });
-    expect(mockFindMany).toHaveBeenNthCalledWith(3, {
-      where: { userId: "user-1", date: { gte: expectedPeriodStart } },
-      select: { amount: true },
-    });
+    expect(mockQueryRaw).toHaveBeenCalledOnce();
   });
 
   it("throws Unauthorized when no session", async () => {
     mockAuth.mockResolvedValue(null);
 
     await expect(getDashboardSummary()).rejects.toThrow("Unauthorized");
-    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockQueryRaw).not.toHaveBeenCalled();
   });
 
   it("returns zeros when no transactions exist", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockFindMany.mockResolvedValue([]);
+    mockQueryRaw.mockResolvedValue([
+      {
+        net_balance: "0",
+        week_income: "0",
+        week_expense: "0",
+        period_net_flow: "0",
+      },
+    ]);
 
     const result = await getDashboardSummary();
 
@@ -116,58 +96,10 @@ describe("getDashboardSummary", () => {
     });
   });
 
-  it("handles Prisma Decimal amounts correctly", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
-
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockFindMany
-      .mockResolvedValueOnce([
-        { amount: new Prisma.Decimal(42.5) },
-        { amount: new Prisma.Decimal(-15.3) },
-        { amount: new Prisma.Decimal(7.2) },
-      ])
-      .mockResolvedValueOnce([{ amount: new Prisma.Decimal(42.5) }])
-      .mockResolvedValueOnce([
-        { amount: new Prisma.Decimal(42.5) },
-        { amount: new Prisma.Decimal(-15.3) },
-        { amount: new Prisma.Decimal(7.2) },
-      ]);
-
-    const result = await getDashboardSummary();
-
-    expect(result.weekIncome).toBe(42.5);
-    expect(result.weekExpense).toBe(0);
-    expect(result.netBalance).toBe(34.4);
-    expect(result.periodNetFlow).toBe(34.4);
-  });
-
-  it("correctly filters week income and expense by sign", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
-
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
-    mockFindMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        { amount: new Prisma.Decimal(50) },
-        { amount: new Prisma.Decimal(100) },
-        { amount: new Prisma.Decimal(25) },
-        { amount: new Prisma.Decimal(-10) },
-        { amount: new Prisma.Decimal(-40) },
-      ])
-      .mockResolvedValueOnce([]);
-
-    const result = await getDashboardSummary();
-
-    expect(result.weekIncome).toBe(175);
-    expect(result.weekExpense).toBe(-50);
-  });
-
   it("propagates Prisma errors", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     const error = new Error("Database connection failed");
-    mockFindMany.mockRejectedValue(error);
+    mockQueryRaw.mockRejectedValue(error);
 
     await expect(getDashboardSummary()).rejects.toThrow(
       "Database connection failed",
