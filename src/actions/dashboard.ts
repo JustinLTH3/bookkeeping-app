@@ -78,46 +78,30 @@ async function _getDashboardSummary(
   const weekStart = now.startOf("isoWeek").toDate();
   const periodStart = getStartDate(timeRange).toDate();
 
-  const [allTransactions, weekTransactions, periodTransactions] =
-    await Promise.all([
-      prisma.transaction.findMany({
-        where: { userId },
-        select: { amount: true },
-      }),
-      prisma.transaction.findMany({
-        where: { userId, date: { gte: weekStart } },
-        select: { amount: true },
-      }),
-      prisma.transaction.findMany({
-        where: { userId, date: { gte: periodStart } },
-        select: { amount: true },
-      }),
-    ]);
+  const rows = await prisma.$queryRaw<
+    Array<{
+      net_balance: string;
+      week_income: string;
+      week_expense: string;
+      period_net_flow: string;
+    }>
+  >`
+    SELECT
+      COALESCE(SUM(amount), 0) AS net_balance,
+      COALESCE(SUM(amount) FILTER (WHERE date >= ${weekStart} AND amount > 0), 0) AS week_income,
+      COALESCE(SUM(amount) FILTER (WHERE date >= ${weekStart} AND amount < 0), 0) AS week_expense,
+      COALESCE(SUM(amount) FILTER (WHERE date >= ${periodStart}), 0) AS period_net_flow
+    FROM "Transaction"
+    WHERE "userId" = ${userId}
+  `;
 
-  const zero = new Prisma.Decimal(0);
-
-  const weekIncome = weekTransactions
-    .filter((t) => t.amount.gt(0))
-    .reduce((s, t) => s.plus(t.amount), zero)
-    .toNumber();
-  const weekExpense = weekTransactions
-    .filter((t) => t.amount.lt(0))
-    .reduce((s, t) => s.plus(t.amount), zero)
-    .toNumber();
-
-  const netBalance = allTransactions
-    .reduce((s, t) => s.plus(t.amount), zero)
-    .toNumber();
-
-  const periodNetFlow = periodTransactions
-    .reduce((s, t) => s.plus(t.amount), zero)
-    .toNumber();
+  const row = rows[0];
 
   return {
-    weekIncome,
-    weekExpense,
-    netBalance,
-    periodNetFlow,
+    weekIncome: Number(row.week_income),
+    weekExpense: Number(row.week_expense),
+    netBalance: Number(row.net_balance),
+    periodNetFlow: Number(row.period_net_flow),
     periodLabel: PERIOD_LABELS[timeRange],
   };
 }
