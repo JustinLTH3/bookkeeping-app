@@ -12,6 +12,7 @@ const {
   mockCreate,
   mockUpdate,
   mockDelete,
+  mockCount,
   mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockCreate: vi.fn(),
   mockUpdate: vi.fn(),
   mockDelete: vi.fn(),
+  mockCount: vi.fn(),
   mockRevalidatePath: vi.fn(),
 }));
 
@@ -33,6 +35,7 @@ vi.mock("@/lib/prisma", () => ({
       create: mockCreate,
       update: mockUpdate,
       delete: mockDelete,
+      count: mockCount,
     },
   },
 }));
@@ -46,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("getTransactions", () => {
-  it("returns transactions for authenticated user ordered by date desc", async () => {
+  it("returns paginated transactions with totalCount", async () => {
     const transactions = [
       {
         id: "txn-1",
@@ -70,32 +73,53 @@ describe("getTransactions", () => {
 
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue(transactions);
+    mockCount.mockResolvedValue(15);
 
-    const result = await getTransactions();
+    const result = await getTransactions(1, 10);
 
-    expect(result).toEqual([
-      {
-        id: "txn-1",
-        amount: 50,
-        description: "Groceries",
-        date: "2024-06-15",
-        categoryId: "cat-1",
-        category: { id: "cat-1", name: "Food" },
-      },
-      {
-        id: "txn-2",
-        amount: -25,
-        description: "Bus fare",
-        date: "2024-06-10",
-        categoryId: "cat-2",
-        category: { id: "cat-2", name: "Transport" },
-      },
-    ]);
+    expect(result).toEqual({
+      transactions: [
+        {
+          id: "txn-1",
+          amount: 50,
+          description: "Groceries",
+          date: "2024-06-15",
+          categoryId: "cat-1",
+          category: { id: "cat-1", name: "Food" },
+        },
+        {
+          id: "txn-2",
+          amount: -25,
+          description: "Bus fare",
+          date: "2024-06-10",
+          categoryId: "cat-2",
+          category: { id: "cat-2", name: "Transport" },
+        },
+      ],
+      totalCount: 15,
+    });
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
       orderBy: { date: "desc" },
+      skip: 0,
+      take: 10,
       include: { category: { select: { id: true, name: true } } },
     });
+    expect(mockCount).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+    });
+  });
+
+  it("defaults to page 1 limit 10", async () => {
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    await getTransactions();
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 0, take: 10 }),
+    );
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -108,10 +132,11 @@ describe("getTransactions", () => {
   it("returns empty array when user has no transactions", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
 
-    const result = await getTransactions();
+    const result = await getTransactions(1, 10);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ transactions: [], totalCount: 0 });
   });
 
   it("maps Prisma Decimal amount to number and formats date to YYYY-MM-DD", async () => {
@@ -129,11 +154,12 @@ describe("getTransactions", () => {
         category: { id: "cat-1", name: "Food" },
       },
     ]);
+    mockCount.mockResolvedValue(1);
 
-    const result = await getTransactions();
+    const result = await getTransactions(1, 10);
 
-    expect(result[0].amount).toBe(42.5);
-    expect(result[0].date).toBe("2024-03-15");
+    expect(result.transactions[0].amount).toBe(42.5);
+    expect(result.transactions[0].date).toBe("2024-03-15");
   });
 });
 
@@ -180,6 +206,7 @@ describe("createTransaction", () => {
       include: { category: { select: { id: true, name: true } } },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -262,6 +289,7 @@ describe("updateTransaction", () => {
       },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -332,6 +360,7 @@ describe("deleteTransaction", () => {
       where: { id: "txn-1", userId: "user-1" },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard");
   });
 
   it("throws Unauthorized when no session", async () => {

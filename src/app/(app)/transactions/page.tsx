@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -25,12 +25,25 @@ export type Transaction = {
 type Category = { id: string; name: string };
 
 const ITEMS_PER_PAGE = 10;
+const CACHE_WINDOW = 2;
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [pageCache, setPageCache] = useState<Record<number, Transaction[]>>({});
+  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const pageCacheRef = useRef(pageCache);
+  const totalCountRef = useRef(totalCount);
+
+  useEffect(() => {
+    pageCacheRef.current = pageCache;
+  }, [pageCache]);
+
+  useEffect(() => {
+    totalCountRef.current = totalCount;
+  }, [totalCount]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
@@ -42,15 +55,87 @@ export default function TransactionsPage() {
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const displayData = pageCache[currentPage] ?? [];
+
+  const trimCache = useCallback((centerPage: number) => {
+    setPageCache((prev) => {
+      const min = centerPage - CACHE_WINDOW;
+      const max = centerPage + CACHE_WINDOW;
+      const next: Record<number, Transaction[]> = {};
+      for (const key of Object.keys(prev)) {
+        const n = Number(key);
+        if (n >= min && n <= max) next[n] = prev[n];
+      }
+      return next;
+    });
+  }, []);
+
+  const preloadPages = useCallback((activePage: number) => {
+    const maxPage = Math.max(
+      1,
+      Math.ceil(totalCountRef.current / ITEMS_PER_PAGE),
+    );
+    const min = Math.max(1, activePage - CACHE_WINDOW);
+    const max = Math.min(maxPage, activePage + CACHE_WINDOW);
+    for (let p = min; p <= max; p++) {
+      if (pageCacheRef.current[p]) continue;
+      getTransactions(p, ITEMS_PER_PAGE).then(
+        ({ transactions, totalCount: count }) => {
+          setPageCache((prev) => ({ ...prev, [p]: transactions }));
+          setTotalCount((prev) => Math.max(prev, count));
+        },
+      );
+    }
+  }, []);
+
+  const refreshCachedPages = useCallback(async (centerPage: number) => {
+    const pageSet = new Set(Object.keys(pageCacheRef.current).map(Number));
+    pageSet.add(centerPage);
+
+    const newCache: Record<number, Transaction[]> = {};
+    let maxTotal = 0;
+
+    await Promise.all(
+      Array.from(pageSet, async (p) => {
+        const { transactions, totalCount: count } = await getTransactions(
+          p,
+          ITEMS_PER_PAGE,
+        );
+        newCache[p] = transactions;
+        if (count > maxTotal) maxTotal = count;
+      }),
+    );
+
+    setPageCache(newCache);
+    setTotalCount(maxTotal);
+  }, []);
+
+  const goToPage = useCallback(
+    async (page: number) => {
+      if (page < 1 || page > totalPages) return;
+
+      if (!pageCacheRef.current[page]) {
+        await refreshCachedPages(page);
+      }
+
+      setCurrentPage(page);
+      preloadPages(page);
+      trimCache(page);
+    },
+    [totalPages, refreshCachedPages, preloadPages, trimCache],
+  );
+
   useEffect(() => {
     async function load() {
       try {
-        const [txns, cats] = await Promise.all([
-          getTransactions(),
+        const [txnResult, catResult] = await Promise.all([
+          getTransactions(1, ITEMS_PER_PAGE),
           getCategories(),
         ]);
-        setTransactions(txns);
-        setCategories(cats);
+        setPageCache({ 1: txnResult.transactions });
+        setTotalCount(txnResult.totalCount);
+        setCategories(catResult.categories);
       } catch {
         // keep empty state on error
       } finally {
@@ -59,13 +144,6 @@ export default function TransactionsPage() {
     }
     load();
   }, []);
-
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
-
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return transactions.slice(start, start + ITEMS_PER_PAGE);
-  }, [transactions, currentPage]);
 
   function handleOpenAddModal() {
     setEditingTransaction(null);
@@ -96,7 +174,17 @@ export default function TransactionsPage() {
     setDeleteError("");
     try {
       await deleteTransaction(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
+      const preDeleteData = pageCacheRef.current[currentPage] ?? [];
+      if (preDeleteData.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+        await refreshCachedPages(currentPage - 1);
+        preloadPages(currentPage - 1);
+        trimCache(currentPage - 1);
+      } else {
+        await refreshCachedPages(currentPage);
+        preloadPages(currentPage);
+        trimCache(currentPage);
+      }
     } catch (e) {
       setDeleteError(
         e instanceof Error ? e.message : "Failed to delete transaction",
@@ -121,50 +209,28 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (editingTransaction) {
-      try {
+    try {
+      if (editingTransaction) {
         await updateTransaction(editingTransaction.id, {
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
         });
-        const category = categories.find((c) => c.id === categoryId)!;
-        setTransactions((prev) =>
-          prev.map((t) =>
-            t.id === editingTransaction.id
-              ? {
-                  ...t,
-                  amount: numAmount,
-                  description: description || null,
-                  date,
-                  categoryId,
-                  category,
-                }
-              : t,
-          ),
-        );
-        handleCloseModal();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Failed to update transaction",
-        );
-      }
-    } else {
-      try {
-        const created = await createTransaction({
+      } else {
+        await createTransaction({
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
         });
-        setTransactions((prev) => [created, ...prev]);
-        handleCloseModal();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Failed to create transaction",
-        );
       }
+      await refreshCachedPages(currentPage);
+      preloadPages(currentPage);
+      trimCache(currentPage);
+      handleCloseModal();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save transaction");
     }
   }
 
@@ -192,14 +258,14 @@ export default function TransactionsPage() {
               <p className="mb-4 text-sm text-red-600">{deleteError}</p>
             )}
             <TransactionTable
-              transactions={paginatedTransactions}
+              transactions={displayData}
               onEdit={handleOpenEditModal}
               onDelete={handleDelete}
             />
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
-              onPageChange={setCurrentPage}
+              onPageChange={goToPage}
             />
           </>
         )}

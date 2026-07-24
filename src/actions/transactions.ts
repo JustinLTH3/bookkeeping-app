@@ -14,17 +14,28 @@ export type TransactionResponse = {
   category: { id: string; name: string };
 };
 
-export async function getTransactions(): Promise<TransactionResponse[]> {
+export async function getTransactions(
+  page = 1,
+  limit = 10,
+): Promise<{ transactions: TransactionResponse[]; totalCount: number }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
-  const transactions = await prisma.transaction.findMany({
-    where: { userId: session.user.id },
-    orderBy: { date: "desc" },
-    include: { category: { select: { id: true, name: true } } },
-  });
+  const where = { userId: session.user.id };
+  const skip = (page - 1) * limit;
 
-  return transactions.map((t) => ({
+  const [rows, totalCount] = await Promise.all([
+    prisma.transaction.findMany({
+      where,
+      orderBy: { date: "desc" },
+      skip,
+      take: limit,
+      include: { category: { select: { id: true, name: true } } },
+    }),
+    prisma.transaction.count({ where }),
+  ]);
+
+  const transactions = rows.map((t) => ({
     id: t.id,
     amount: Number(t.amount),
     description: t.description,
@@ -32,6 +43,8 @@ export async function getTransactions(): Promise<TransactionResponse[]> {
     categoryId: t.categoryId,
     category: t.category,
   }));
+
+  return { transactions, totalCount };
 }
 
 export async function createTransaction(data: {
@@ -65,6 +78,7 @@ export async function createTransaction(data: {
   });
 
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 
   return {
     id: transaction.id,
@@ -109,6 +123,7 @@ export async function updateTransaction(
   });
 
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -120,4 +135,5 @@ export async function deleteTransaction(id: string): Promise<void> {
   });
 
   revalidatePath("/transactions");
+  revalidatePath("/dashboard");
 }
