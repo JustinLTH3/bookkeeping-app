@@ -213,7 +213,7 @@ async function _getRecentTransactions(
 ): Promise<RecentTransaction[]> {
   const transactions = await prisma.transaction.findMany({
     where: { userId },
-    orderBy: { date: "desc" },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 5,
     select: {
       id: true,

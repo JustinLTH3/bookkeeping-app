@@ -339,7 +339,7 @@ describe("getRecentTransactions", () => {
 
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 5,
       select: {
         id: true,

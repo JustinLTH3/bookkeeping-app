@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  afterAll,
+} from "vitest";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { prisma } from "@/lib/prisma";
@@ -47,8 +55,16 @@ function asUser(id: string) {
 }
 
 beforeEach(async () => {
+  // Freeze only Date so dayjs-based boundaries in tests and actions share one
+  // instant; setTimeout/setInterval stay real for the pg driver.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date());
   mockAuth.mockReset();
   await truncateAll();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 afterAll(async () => {
@@ -136,6 +152,22 @@ describe("getDashboardSummary", () => {
       periodLabel: "Monthly",
     });
   });
+
+  it("handles extreme amounts through raw SQL aggregation", async () => {
+    const user = await createUser("a@test.com");
+    const salary = await createCategory(user.id, "Salary");
+
+    const now = dayjs().toDate();
+    // Decimal(12,2) maximum and minimum increment
+    await createTransaction(user.id, salary.id, 9999999999.99, now);
+    await createTransaction(user.id, salary.id, 0.01, now);
+
+    asUser(user.id);
+    const result = await getDashboardSummary("weekly");
+
+    expect(result.netBalance).toBeCloseTo(10000000000, 2);
+    expect(result.weekIncome).toBeCloseTo(10000000000, 2);
+  });
 });
 
 describe("getExpensesByCategory", () => {
@@ -166,6 +198,25 @@ describe("getExpensesByCategory", () => {
       { categoryName: "Transport", total: -100 },
       { categoryName: "Food", total: -70.5 },
     ]);
+  });
+
+  it("includes expenses dated exactly at the period start", async () => {
+    const user = await createUser("a@test.com");
+    const food = await createCategory(user.id, "Food");
+
+    const monthStart = dayjs().startOf("month");
+    await createTransaction(user.id, food.id, -25, monthStart.toDate());
+    await createTransaction(
+      user.id,
+      food.id,
+      -75,
+      monthStart.subtract(1, "day").toDate(),
+    );
+
+    asUser(user.id);
+    const result = await getExpensesByCategory("monthly");
+
+    expect(result).toEqual([{ categoryName: "Food", total: -25 }]);
   });
 
   it("returns an empty array when there are no expenses in range", async () => {
@@ -217,6 +268,28 @@ describe("getCashFlow", () => {
     expect(result).toHaveLength(7);
     expect(result.every((p) => p.balance === 0)).toBe(true);
   });
+
+  it("excludes transactions before the period start", async () => {
+    const user = await createUser("a@test.com");
+    const food = await createCategory(user.id, "Food");
+
+    const weekStart = dayjs().startOf("isoWeek");
+    // Last week: must not roll into this week's opening balance
+    await createTransaction(
+      user.id,
+      food.id,
+      -500,
+      weekStart.subtract(1, "day").toDate(),
+    );
+    await createTransaction(user.id, food.id, 100, weekStart.toDate());
+
+    asUser(user.id);
+    const result = await getCashFlow("weekly");
+
+    expect(result).toHaveLength(7);
+    expect(result[0].balance).toBe(100);
+    expect(result[6].balance).toBe(100);
+  });
 });
 
 describe("getRecentTransactions", () => {
@@ -260,6 +333,39 @@ describe("getRecentTransactions", () => {
     const result = await getRecentTransactions();
 
     expect(result).toEqual([]);
+  });
+
+  it("breaks same-date ties by most recently created first", async () => {
+    const user = await createUser("a@test.com");
+    const food = await createCategory(user.id, "Food");
+
+    const sameDay = dayjs().toDate();
+    // Explicit createdAt: deterministic under the frozen clock
+    await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        categoryId: food.id,
+        amount: -10,
+        date: sameDay,
+        description: "older",
+        createdAt: dayjs().subtract(1, "hour").toDate(),
+      },
+    });
+    await prisma.transaction.create({
+      data: {
+        userId: user.id,
+        categoryId: food.id,
+        amount: -20,
+        date: sameDay,
+        description: "newer",
+        createdAt: dayjs().toDate(),
+      },
+    });
+
+    asUser(user.id);
+    const result = await getRecentTransactions();
+
+    expect(result.map((t) => t.description)).toEqual(["newer", "older"]);
   });
 });
 
