@@ -17,6 +17,14 @@ import {
   getRecentTransactions,
   getDashboardData,
 } from "@/actions/dashboard";
+import {
+  truncateAll,
+  createUser,
+  createCategory,
+  createTransaction,
+  expectDec,
+  faker,
+} from "./helpers";
 
 dayjs.extend(isoWeek);
 
@@ -26,35 +34,12 @@ vi.mock("@/lib/auth", () => ({
   auth: mockAuth,
 }));
 
-async function truncateAll() {
-  await prisma.$executeRaw`TRUNCATE TABLE "Transaction", "Category", "User" CASCADE`;
-}
-
-function createUser(email: string) {
-  return prisma.user.create({ data: { email, name: email } });
-}
-
-function createCategory(userId: string, name: string) {
-  return prisma.category.create({ data: { userId, name } });
-}
-
-function createTransaction(
-  userId: string,
-  categoryId: string,
-  amount: number,
-  date: Date,
-  description?: string,
-) {
-  return prisma.transaction.create({
-    data: { userId, categoryId, amount, date, description },
-  });
-}
-
 function asUser(id: string) {
   mockAuth.mockResolvedValue({ user: { id } });
 }
 
 beforeEach(async () => {
+  faker.seed(123);
   // Freeze only Date so dayjs-based boundaries in tests and actions share one
   // instant; setTimeout/setInterval stay real for the pg driver.
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -73,7 +58,7 @@ afterAll(async () => {
 
 describe("getDashboardSummary", () => {
   it("aggregates week totals and net balance from real rows", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
     const salary = await createCategory(user.id, "Salary");
 
@@ -92,14 +77,14 @@ describe("getDashboardSummary", () => {
     asUser(user.id);
     const result = await getDashboardSummary("monthly");
 
-    expect(result.weekIncome).toBeCloseTo(1000);
-    expect(result.weekExpense).toBeCloseTo(-50.25);
-    expect(result.netBalance).toBeCloseTo(749.75);
+    expectDec(result.weekIncome, 1000);
+    expectDec(result.weekExpense, -50.25);
+    expectDec(result.netBalance, 749.75);
     expect(result.periodLabel).toBe("Monthly");
   });
 
   it("applies the monthly period filter at the month boundary", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const salary = await createCategory(user.id, "Salary");
 
     const monthStart = dayjs().startOf("month");
@@ -114,12 +99,12 @@ describe("getDashboardSummary", () => {
     asUser(user.id);
     const result = await getDashboardSummary("monthly");
 
-    expect(result.periodNetFlow).toBeCloseTo(500);
-    expect(result.netBalance).toBeCloseTo(-499);
+    expectDec(result.periodNetFlow, 500);
+    expectDec(result.netBalance, -499);
   });
 
   it("applies the yearly period filter at the year boundary", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const salary = await createCategory(user.id, "Salary");
 
     const yearStart = dayjs().startOf("year");
@@ -134,12 +119,12 @@ describe("getDashboardSummary", () => {
     asUser(user.id);
     const result = await getDashboardSummary("yearly");
 
-    expect(result.periodNetFlow).toBeCloseTo(1200);
-    expect(result.netBalance).toBeCloseTo(900);
+    expectDec(result.periodNetFlow, 1200);
+    expectDec(result.netBalance, 900);
   });
 
   it("returns zeros when the user has no transactions", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
 
     asUser(user.id);
     const result = await getDashboardSummary("monthly");
@@ -154,7 +139,7 @@ describe("getDashboardSummary", () => {
   });
 
   it("handles extreme amounts through raw SQL aggregation", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const salary = await createCategory(user.id, "Salary");
 
     const now = dayjs().toDate();
@@ -165,14 +150,14 @@ describe("getDashboardSummary", () => {
     asUser(user.id);
     const result = await getDashboardSummary("weekly");
 
-    expect(result.netBalance).toBeCloseTo(10000000000, 2);
-    expect(result.weekIncome).toBeCloseTo(10000000000, 2);
+    expectDec(result.netBalance, 10000000000);
+    expectDec(result.weekIncome, 10000000000);
   });
 });
 
 describe("getExpensesByCategory", () => {
   it("groups expenses by category, excluding income and out-of-range rows", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
     const transport = await createCategory(user.id, "Transport");
     const salary = await createCategory(user.id, "Salary");
@@ -201,7 +186,7 @@ describe("getExpensesByCategory", () => {
   });
 
   it("includes expenses dated exactly at the period start", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
 
     const monthStart = dayjs().startOf("month");
@@ -220,7 +205,7 @@ describe("getExpensesByCategory", () => {
   });
 
   it("returns an empty array when there are no expenses in range", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const salary = await createCategory(user.id, "Salary");
     await createTransaction(user.id, salary.id, 3000, dayjs().toDate());
 
@@ -233,7 +218,7 @@ describe("getExpensesByCategory", () => {
 
 describe("getCashFlow", () => {
   it("builds a cumulative daily series across the current week", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
     const salary = await createCategory(user.id, "Salary");
 
@@ -260,7 +245,7 @@ describe("getCashFlow", () => {
   });
 
   it("returns a zero-filled week when there are no transactions", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
 
     asUser(user.id);
     const result = await getCashFlow("weekly");
@@ -270,7 +255,7 @@ describe("getCashFlow", () => {
   });
 
   it("excludes transactions before the period start", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
 
     const weekStart = dayjs().startOf("isoWeek");
@@ -294,7 +279,7 @@ describe("getCashFlow", () => {
 
 describe("getRecentTransactions", () => {
   it("returns the 5 most recent transactions with mapped fields", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
 
     for (let i = 0; i <= 5; i++) {
@@ -327,7 +312,7 @@ describe("getRecentTransactions", () => {
   });
 
   it("returns an empty array when the user has no transactions", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
 
     asUser(user.id);
     const result = await getRecentTransactions();
@@ -336,7 +321,7 @@ describe("getRecentTransactions", () => {
   });
 
   it("breaks same-date ties by most recently created first", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
 
     const sameDay = dayjs().toDate();
@@ -371,7 +356,7 @@ describe("getRecentTransactions", () => {
 
 describe("getDashboardData", () => {
   it("returns all dashboard sections in a single call", async () => {
-    const user = await createUser("a@test.com");
+    const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
     const salary = await createCategory(user.id, "Salary");
 
@@ -383,20 +368,20 @@ describe("getDashboardData", () => {
     const result = await getDashboardData("weekly");
 
     expect(result.summary.periodLabel).toBe("Weekly");
-    expect(result.summary.netBalance).toBeCloseTo(754.5);
+    expectDec(result.summary.netBalance, 754.5);
     expect(result.expensesByCategory).toEqual([
       { categoryName: "Food", total: -45.5 },
     ]);
     expect(result.cashFlow).toHaveLength(7);
-    expect(result.cashFlow[6].balance).toBeCloseTo(754.5);
+    expectDec(result.cashFlow[6].balance, 754.5);
     expect(result.recentTransactions).toHaveLength(2);
   });
 });
 
 describe("multi-tenancy", () => {
   it("excludes other users' data from every dashboard query", async () => {
-    const userA = await createUser("a@test.com");
-    const userB = await createUser("b@test.com");
+    const userA = await createUser(faker.internet.email());
+    const userB = await createUser(faker.internet.email());
     // Identical category names on both users to exercise join scoping
     const foodA = await createCategory(userA.id, "Food");
     const foodB = await createCategory(userB.id, "Food");
@@ -409,9 +394,9 @@ describe("multi-tenancy", () => {
     asUser(userA.id);
 
     const summary = await getDashboardSummary("monthly");
-    expect(summary.netBalance).toBeCloseTo(-40);
-    expect(summary.weekExpense).toBeCloseTo(-40);
-    expect(summary.weekIncome).toBeCloseTo(0);
+    expectDec(summary.netBalance, -40);
+    expectDec(summary.weekExpense, -40);
+    expectDec(summary.weekIncome, 0);
 
     const expenses = await getExpensesByCategory("monthly");
     expect(expenses).toEqual([{ categoryName: "Food", total: -40 }]);
