@@ -18,5 +18,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Read the relevant Next.js guide in `node_modules/next/dist/docs/` before writing code — this project uses Next.js 16 with breaking changes.
 - Use `npm run lint` to lint the project.
 - Use `npm run dev` to start the development server.
+- Use `npm test` for unit tests (no database required).
+- Use `npm run test:integration` for DB-backed integration tests — requires the test database: `docker compose up -d` (postgres:16 on port 5433, or set `TEST_DATABASE_URL`). Migrations are applied automatically by the Vitest global setup. The suite includes 50k-row scale tests; set `SCALE_ROWS` to change the row count.
 - Never commit unless explicitly requested.
 - Always wrap test names in quotes when running with Vitest: `npx vitest run "test name"`
