@@ -12,6 +12,7 @@ const {
   mockCreate,
   mockDelete,
   mockUpdate,
+  mockCount,
   mockRevalidatePath,
 } = vi.hoisted(() => ({
   mockAuth: vi.fn(),
@@ -19,6 +20,7 @@ const {
   mockCreate: vi.fn(),
   mockDelete: vi.fn(),
   mockUpdate: vi.fn(),
+  mockCount: vi.fn(),
   mockRevalidatePath: vi.fn(),
 }));
 
@@ -33,6 +35,7 @@ vi.mock("@/lib/prisma", () => ({
       create: mockCreate,
       delete: mockDelete,
       update: mockUpdate,
+      count: mockCount,
     },
   },
 }));
@@ -46,7 +49,7 @@ beforeEach(() => {
 });
 
 describe("getCategories", () => {
-  it("returns categories for authenticated user ordered by createdAt desc", async () => {
+  it("returns all categories when called without pagination", async () => {
     const categories = [
       { id: "cat-1", name: "Food" },
       { id: "cat-2", name: "Transport" },
@@ -56,11 +59,42 @@ describe("getCategories", () => {
 
     const result = await getCategories();
 
-    expect(result).toEqual(categories);
+    expect(result).toEqual({
+      categories,
+      totalCount: 2,
+    });
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
       orderBy: { createdAt: "desc" },
       select: { id: true, name: true },
+    });
+    expect(mockCount).not.toHaveBeenCalled();
+  });
+
+  it("returns paginated categories when offset and limit provided", async () => {
+    const categories = [
+      { id: "cat-1", name: "Food" },
+      { id: "cat-2", name: "Transport" },
+    ];
+    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockFindMany.mockResolvedValue(categories);
+    mockCount.mockResolvedValue(25);
+
+    const result = await getCategories(0, 10);
+
+    expect(result).toEqual({
+      categories,
+      totalCount: 25,
+    });
+    expect(mockFindMany).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      orderBy: { createdAt: "desc" },
+      skip: 0,
+      take: 10,
+      select: { id: true, name: true },
+    });
+    expect(mockCount).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
     });
   });
 
@@ -71,13 +105,13 @@ describe("getCategories", () => {
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
-  it("returns empty array when user has no categories", async () => {
+  it("returns empty categories array when user has no categories", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([]);
 
     const result = await getCategories();
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ categories: [], totalCount: 0 });
   });
 });
 
@@ -95,6 +129,7 @@ describe("createCategory", () => {
       select: { id: true, name: true },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -162,6 +197,7 @@ describe("deleteCategory", () => {
       select: { id: true, name: true },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -207,6 +243,7 @@ describe("renameCategory", () => {
       select: { id: true, name: true },
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/categories");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/transactions");
   });
 
   it("throws Unauthorized when no session", async () => {

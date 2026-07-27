@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -17,27 +17,58 @@ export type Category = {
 };
 
 const ITEMS_PER_PAGE = 10;
+const CACHE_WINDOW = 2;
 
 export default function CategoriesPage() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [pageCache, setPageCache] = useState<Record<number, Category[]>>({});
+  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [name, setName] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const displayData = pageCache[currentPage] ?? [];
+
+  async function refreshCachedPages(centerPage: number) {
+    const min = Math.max(1, centerPage - CACHE_WINDOW);
+    const max = centerPage + CACHE_WINDOW;
+
+    const offset = (min - 1) * ITEMS_PER_PAGE;
+    const count = (max - min + 1) * ITEMS_PER_PAGE;
+
+    const { categories, totalCount } = await getCategories(offset, count);
+
+    const newCache: Record<number, Category[]> = {};
+    let page = min;
+    for (let start = 0; start < categories.length; start += ITEMS_PER_PAGE) {
+      newCache[page++] = categories.slice(
+        start,
+        Math.min(start + ITEMS_PER_PAGE, categories.length),
+      );
+    }
+
+    setPageCache(newCache);
+    setTotalCount(totalCount);
+  }
+
+  async function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    if (!pageCache[page]) {
+      await refreshCachedPages(page);
+    }
+    setCurrentPage(page);
+  }
+
   useEffect(() => {
-    getCategories().then(setCategories);
+    async function load() {
+      await refreshCachedPages(1);
+    }
+    load();
   }, []);
-
-  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
-
-  const paginatedCategories = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return categories.slice(start, start + ITEMS_PER_PAGE);
-  }, [categories, currentPage]);
 
   function handleOpenAddModal() {
     setEditingCategory(null);
@@ -62,11 +93,16 @@ export default function CategoriesPage() {
     setDeleteError("");
     try {
       await deleteCategory(id);
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Failed to delete category",
-      );
+      const preDeleteData = pageCache[currentPage] ?? [];
+      if (preDeleteData.length === 1 && currentPage > 1) {
+        const targetPage = currentPage - 1;
+        setCurrentPage(targetPage);
+        await refreshCachedPages(targetPage);
+      } else {
+        await refreshCachedPages(currentPage);
+      }
+    } catch {
+      setDeleteError("Failed to delete category");
     }
   }
 
@@ -77,25 +113,19 @@ export default function CategoriesPage() {
       return;
     }
 
-    setIsSaving(true);
     try {
       if (editingCategory) {
-        const updated = await renameCategory({
+        await renameCategory({
           id: editingCategory.id,
           name: name.trim(),
         });
-        setCategories((prev) =>
-          prev.map((c) => (c.id === updated.id ? updated : c)),
-        );
       } else {
-        const category = await createCategory({ name: name.trim() });
-        setCategories((prev) => [category, ...prev]);
+        await createCategory({ name: name.trim() });
       }
       handleCloseModal();
+      await refreshCachedPages(currentPage);
     } catch {
       setError("Failed to save category");
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -119,14 +149,14 @@ export default function CategoriesPage() {
           <p className="mb-4 text-sm text-red-600">{deleteError}</p>
         )}
         <CategoryTable
-          categories={paginatedCategories}
+          categories={displayData}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
         />
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={setCurrentPage}
+          onPageChange={goToPage}
         />
       </div>
 
@@ -158,18 +188,16 @@ export default function CategoriesPage() {
             <button
               type="button"
               onClick={handleCloseModal}
-              disabled={isSaving}
-              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral disabled:opacity-50"
+              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:opacity-50"
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
             >
-              {isSaving ? "Saving..." : "Save"}
+              Save
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -25,12 +25,14 @@ export type Transaction = {
 type Category = { id: string; name: string };
 
 const ITEMS_PER_PAGE = 10;
+const CACHE_WINDOW = 2;
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [pageCache, setPageCache] = useState<Record<number, Transaction[]>>({});
+  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
@@ -42,30 +44,47 @@ export default function TransactionsPage() {
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
+  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
+  const displayData = pageCache[currentPage] ?? [];
+
+  async function refreshCachedPages(centerPage: number) {
+    const min = Math.max(1, centerPage - CACHE_WINDOW);
+    const max = centerPage + CACHE_WINDOW;
+
+    const offset = (min - 1) * ITEMS_PER_PAGE;
+    const count = (max - min + 1) * ITEMS_PER_PAGE;
+
+    const { transactions, totalCount } = await getTransactions(offset, count);
+
+    const newCache: Record<number, Transaction[]> = {};
+    let page = min;
+    for (let start = 0; start < transactions.length; start += ITEMS_PER_PAGE) {
+      newCache[page++] = transactions.slice(
+        start,
+        Math.min(start + ITEMS_PER_PAGE, transactions.length),
+      );
+    }
+
+    setPageCache(newCache);
+    setTotalCount(totalCount);
+  }
+
+  async function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    if (!pageCache[page]) {
+      await refreshCachedPages(page);
+    }
+    setCurrentPage(page);
+  }
+
   useEffect(() => {
     async function load() {
-      try {
-        const [txns, cats] = await Promise.all([
-          getTransactions(),
-          getCategories(),
-        ]);
-        setTransactions(txns);
-        setCategories(cats);
-      } catch {
-        // keep empty state on error
-      } finally {
-        setInitialLoading(false);
-      }
+      await refreshCachedPages(1);
+      const { categories } = await getCategories();
+      setCategories(categories);
     }
     load();
   }, []);
-
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE);
-
-  const paginatedTransactions = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return transactions.slice(start, start + ITEMS_PER_PAGE);
-  }, [transactions, currentPage]);
 
   function handleOpenAddModal() {
     setEditingTransaction(null);
@@ -96,11 +115,16 @@ export default function TransactionsPage() {
     setDeleteError("");
     try {
       await deleteTransaction(id);
-      setTransactions((prev) => prev.filter((t) => t.id !== id));
-    } catch (e) {
-      setDeleteError(
-        e instanceof Error ? e.message : "Failed to delete transaction",
-      );
+      const preDeleteData = pageCache[currentPage] ?? [];
+      if (preDeleteData.length === 1 && currentPage > 1) {
+        const targetPage = currentPage - 1;
+        setCurrentPage(targetPage);
+        await refreshCachedPages(targetPage);
+      } else {
+        await refreshCachedPages(currentPage);
+      }
+    } catch {
+      setDeleteError("Failed to delete transaction");
     }
   }
 
@@ -121,50 +145,26 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (editingTransaction) {
-      try {
+    try {
+      if (editingTransaction) {
         await updateTransaction(editingTransaction.id, {
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
         });
-        const category = categories.find((c) => c.id === categoryId)!;
-        setTransactions((prev) =>
-          prev.map((t) =>
-            t.id === editingTransaction.id
-              ? {
-                  ...t,
-                  amount: numAmount,
-                  description: description || null,
-                  date,
-                  categoryId,
-                  category,
-                }
-              : t,
-          ),
-        );
-        handleCloseModal();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Failed to update transaction",
-        );
-      }
-    } else {
-      try {
-        const created = await createTransaction({
+      } else {
+        await createTransaction({
           amount: numAmount,
           description: description || null,
           date,
           categoryId,
         });
-        setTransactions((prev) => [created, ...prev]);
-        handleCloseModal();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "Failed to create transaction",
-        );
       }
+      handleCloseModal();
+      await refreshCachedPages(currentPage);
+    } catch {
+      setError("Failed to save transaction");
     }
   }
 
@@ -184,25 +184,19 @@ export default function TransactionsPage() {
       </div>
 
       <div className="mt-8">
-        {initialLoading ? (
-          <p className="text-sm text-tertiary">Loading transactions...</p>
-        ) : (
-          <>
-            {deleteError && (
-              <p className="mb-4 text-sm text-red-600">{deleteError}</p>
-            )}
-            <TransactionTable
-              transactions={paginatedTransactions}
-              onEdit={handleOpenEditModal}
-              onDelete={handleDelete}
-            />
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </>
+        {deleteError && (
+          <p className="mb-4 text-sm text-red-600">{deleteError}</p>
         )}
+        <TransactionTable
+          transactions={displayData}
+          onEdit={handleOpenEditModal}
+          onDelete={handleDelete}
+        />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+        />
       </div>
 
       <Modal

@@ -47,7 +47,7 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                 <td className="px-6 py-4 text-primary text-sm">
                   {dayjs(transaction.date).format("MMM D, YYYY")}
                 </td>
-                <td className="px-6 py-4 text-primary text-sm wrap-break-words">
+                <td className="px-6 py-4 text-primary text-sm wrap-break-word">
                   {transaction.description || "—"}
                 </td>
                 <td className="px-6 py-4 text-primary text-sm">
