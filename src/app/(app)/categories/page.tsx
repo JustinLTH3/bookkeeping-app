@@ -111,10 +111,8 @@ export default function CategoriesPage() {
       } else {
         await refreshCachedPages(currentPage, pageCache);
       }
-    } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Failed to delete category",
-      );
+    } catch {
+      setDeleteError("Failed to delete category");
     }
   }
 

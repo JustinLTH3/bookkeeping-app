@@ -132,10 +132,8 @@ export default function TransactionsPage() {
       } else {
         await refreshCachedPages(currentPage, pageCache);
       }
-    } catch (e) {
-      setDeleteError(
-        e instanceof Error ? e.message : "Failed to delete transaction",
-      );
+    } catch {
+      setDeleteError("Failed to delete transaction");
     }
   }
 
@@ -174,8 +172,8 @@ export default function TransactionsPage() {
       }
       handleCloseModal();
       await refreshCachedPages(currentPage, pageCache);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to save transaction");
+    } catch {
+      setError("Failed to save transaction");
     }
   }
 
