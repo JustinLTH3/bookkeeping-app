@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -23,67 +23,31 @@ export default function CategoriesPage() {
   const [pageCache, setPageCache] = useState<Record<number, Category[]>>({});
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageCacheRef = useRef(pageCache);
-  const totalCountRef = useRef(totalCount);
-
-  useEffect(() => {
-    pageCacheRef.current = pageCache;
-  }, [pageCache]);
-
-  useEffect(() => {
-    totalCountRef.current = totalCount;
-  }, [totalCount]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [name, setName] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const displayData = pageCache[currentPage] ?? [];
 
-  const trimCache = useCallback((centerPage: number) => {
-    setPageCache((prev) => {
-      const min = centerPage - CACHE_WINDOW;
-      const max = centerPage + CACHE_WINDOW;
-      const next: Record<number, Category[]> = {};
-      for (const key of Object.keys(prev)) {
-        const n = Number(key);
-        if (n >= min && n <= max) next[n] = prev[n];
-      }
-      return next;
-    });
-  }, []);
-
-  const preloadPages = useCallback((activePage: number) => {
-    const maxPage = Math.max(
-      1,
-      Math.ceil(totalCountRef.current / ITEMS_PER_PAGE),
-    );
-    const min = Math.max(1, activePage - CACHE_WINDOW);
-    const max = Math.min(maxPage, activePage + CACHE_WINDOW);
-    for (let p = min; p <= max; p++) {
-      if (pageCacheRef.current[p]) continue;
-      getCategories(p, ITEMS_PER_PAGE).then(
-        ({ categories, totalCount: count }) => {
-          setPageCache((prev) => ({ ...prev, [p]: categories }));
-          setTotalCount((prev) => Math.max(prev, count));
-        },
-      );
-    }
-  }, []);
-
-  const refreshCachedPages = useCallback(async (centerPage: number) => {
-    const pageSet = new Set(Object.keys(pageCacheRef.current).map(Number));
+  async function refreshCachedPages(
+    centerPage: number,
+    currentCache: Record<number, Category[]>,
+  ) {
+    const pageSet = new Set(Object.keys(currentCache).map(Number));
     pageSet.add(centerPage);
+    const min = centerPage - CACHE_WINDOW;
+    const max = centerPage + CACHE_WINDOW;
 
     const newCache: Record<number, Category[]> = {};
     let maxTotal = 0;
 
     await Promise.all(
       Array.from(pageSet, async (p) => {
+        if (p < min || p > max) return;
         const { categories, totalCount: count } = await getCategories(
           p,
           ITEMS_PER_PAGE,
@@ -95,22 +59,15 @@ export default function CategoriesPage() {
 
     setPageCache(newCache);
     setTotalCount(maxTotal);
-  }, []);
+  }
 
-  const goToPage = useCallback(
-    async (page: number) => {
-      if (page < 1 || page > totalPages) return;
-
-      if (!pageCacheRef.current[page]) {
-        await refreshCachedPages(page);
-      }
-
-      setCurrentPage(page);
-      preloadPages(page);
-      trimCache(page);
-    },
-    [totalPages, refreshCachedPages, preloadPages, trimCache],
-  );
+  async function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    if (!pageCache[page]) {
+      await refreshCachedPages(page, pageCache);
+    }
+    setCurrentPage(page);
+  }
 
   useEffect(() => {
     async function load() {
@@ -147,16 +104,12 @@ export default function CategoriesPage() {
     setDeleteError("");
     try {
       await deleteCategory(id);
-      const preDeleteData = pageCacheRef.current[currentPage] ?? [];
+      const preDeleteData = pageCache[currentPage] ?? [];
       if (preDeleteData.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
-        await refreshCachedPages(currentPage - 1);
-        preloadPages(currentPage - 1);
-        trimCache(currentPage - 1);
+        await refreshCachedPages(currentPage - 1, pageCache);
       } else {
-        await refreshCachedPages(currentPage);
-        preloadPages(currentPage);
-        trimCache(currentPage);
+        await refreshCachedPages(currentPage, pageCache);
       }
     } catch (err) {
       setDeleteError(
@@ -172,7 +125,6 @@ export default function CategoriesPage() {
       return;
     }
 
-    setIsSaving(true);
     try {
       if (editingCategory) {
         await renameCategory({
@@ -182,14 +134,10 @@ export default function CategoriesPage() {
       } else {
         await createCategory({ name: name.trim() });
       }
-      await refreshCachedPages(currentPage);
-      preloadPages(currentPage);
-      trimCache(currentPage);
       handleCloseModal();
+      await refreshCachedPages(currentPage, pageCache);
     } catch {
       setError("Failed to save category");
-    } finally {
-      setIsSaving(false);
     }
   }
 
@@ -252,18 +200,16 @@ export default function CategoriesPage() {
             <button
               type="button"
               onClick={handleCloseModal}
-              disabled={isSaving}
-              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral disabled:opacity-50"
+              className="rounded-md px-4 py-2 text-sm font-medium text-tertiary hover:bg-neutral"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              disabled={isSaving}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:opacity-50"
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
             >
-              {isSaving ? "Saving..." : "Save"}
+              Save
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -31,18 +31,7 @@ export default function TransactionsPage() {
   const [pageCache, setPageCache] = useState<Record<number, Transaction[]>>({});
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
-  const pageCacheRef = useRef(pageCache);
-  const totalCountRef = useRef(totalCount);
-
-  useEffect(() => {
-    pageCacheRef.current = pageCache;
-  }, [pageCache]);
-
-  useEffect(() => {
-    totalCountRef.current = totalCount;
-  }, [totalCount]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
@@ -58,46 +47,21 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const displayData = pageCache[currentPage] ?? [];
 
-  const trimCache = useCallback((centerPage: number) => {
-    setPageCache((prev) => {
-      const min = centerPage - CACHE_WINDOW;
-      const max = centerPage + CACHE_WINDOW;
-      const next: Record<number, Transaction[]> = {};
-      for (const key of Object.keys(prev)) {
-        const n = Number(key);
-        if (n >= min && n <= max) next[n] = prev[n];
-      }
-      return next;
-    });
-  }, []);
-
-  const preloadPages = useCallback((activePage: number) => {
-    const maxPage = Math.max(
-      1,
-      Math.ceil(totalCountRef.current / ITEMS_PER_PAGE),
-    );
-    const min = Math.max(1, activePage - CACHE_WINDOW);
-    const max = Math.min(maxPage, activePage + CACHE_WINDOW);
-    for (let p = min; p <= max; p++) {
-      if (pageCacheRef.current[p]) continue;
-      getTransactions(p, ITEMS_PER_PAGE).then(
-        ({ transactions, totalCount: count }) => {
-          setPageCache((prev) => ({ ...prev, [p]: transactions }));
-          setTotalCount((prev) => Math.max(prev, count));
-        },
-      );
-    }
-  }, []);
-
-  const refreshCachedPages = useCallback(async (centerPage: number) => {
-    const pageSet = new Set(Object.keys(pageCacheRef.current).map(Number));
+  async function refreshCachedPages(
+    centerPage: number,
+    currentCache: Record<number, Transaction[]>,
+  ) {
+    const pageSet = new Set(Object.keys(currentCache).map(Number));
     pageSet.add(centerPage);
+    const min = centerPage - CACHE_WINDOW;
+    const max = centerPage + CACHE_WINDOW;
 
     const newCache: Record<number, Transaction[]> = {};
     let maxTotal = 0;
 
     await Promise.all(
       Array.from(pageSet, async (p) => {
+        if (p < min || p > max) return;
         const { transactions, totalCount: count } = await getTransactions(
           p,
           ITEMS_PER_PAGE,
@@ -109,38 +73,25 @@ export default function TransactionsPage() {
 
     setPageCache(newCache);
     setTotalCount(maxTotal);
-  }, []);
+  }
 
-  const goToPage = useCallback(
-    async (page: number) => {
-      if (page < 1 || page > totalPages) return;
-
-      if (!pageCacheRef.current[page]) {
-        await refreshCachedPages(page);
-      }
-
-      setCurrentPage(page);
-      preloadPages(page);
-      trimCache(page);
-    },
-    [totalPages, refreshCachedPages, preloadPages, trimCache],
-  );
+  async function goToPage(page: number) {
+    if (page < 1 || page > totalPages) return;
+    if (!pageCache[page]) {
+      await refreshCachedPages(page, pageCache);
+    }
+    setCurrentPage(page);
+  }
 
   useEffect(() => {
     async function load() {
-      try {
-        const [txnResult, catResult] = await Promise.all([
-          getTransactions(1, ITEMS_PER_PAGE),
-          getCategories(),
-        ]);
-        setPageCache({ 1: txnResult.transactions });
-        setTotalCount(txnResult.totalCount);
-        setCategories(catResult.categories);
-      } catch {
-        // keep empty state on error
-      } finally {
-        setInitialLoading(false);
-      }
+      const [txnResult, catResult] = await Promise.all([
+        getTransactions(1, ITEMS_PER_PAGE),
+        getCategories(),
+      ]);
+      setPageCache({ 1: txnResult.transactions });
+      setTotalCount(txnResult.totalCount);
+      setCategories(catResult.categories);
     }
     load();
   }, []);
@@ -174,16 +125,12 @@ export default function TransactionsPage() {
     setDeleteError("");
     try {
       await deleteTransaction(id);
-      const preDeleteData = pageCacheRef.current[currentPage] ?? [];
+      const preDeleteData = pageCache[currentPage] ?? [];
       if (preDeleteData.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
-        await refreshCachedPages(currentPage - 1);
-        preloadPages(currentPage - 1);
-        trimCache(currentPage - 1);
+        await refreshCachedPages(currentPage - 1, pageCache);
       } else {
-        await refreshCachedPages(currentPage);
-        preloadPages(currentPage);
-        trimCache(currentPage);
+        await refreshCachedPages(currentPage, pageCache);
       }
     } catch (e) {
       setDeleteError(
@@ -225,10 +172,8 @@ export default function TransactionsPage() {
           categoryId,
         });
       }
-      await refreshCachedPages(currentPage);
-      preloadPages(currentPage);
-      trimCache(currentPage);
       handleCloseModal();
+      await refreshCachedPages(currentPage, pageCache);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save transaction");
     }
@@ -250,25 +195,19 @@ export default function TransactionsPage() {
       </div>
 
       <div className="mt-8">
-        {initialLoading ? (
-          <p className="text-sm text-tertiary">Loading transactions...</p>
-        ) : (
-          <>
-            {deleteError && (
-              <p className="mb-4 text-sm text-red-600">{deleteError}</p>
-            )}
-            <TransactionTable
-              transactions={displayData}
-              onEdit={handleOpenEditModal}
-              onDelete={handleDelete}
-            />
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={goToPage}
-            />
-          </>
+        {deleteError && (
+          <p className="mb-4 text-sm text-red-600">{deleteError}</p>
         )}
+        <TransactionTable
+          transactions={displayData}
+          onEdit={handleOpenEditModal}
+          onDelete={handleDelete}
+        />
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+        />
       </div>
 
       <Modal
