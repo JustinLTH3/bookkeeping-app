@@ -47,51 +47,41 @@ export default function TransactionsPage() {
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const displayData = pageCache[currentPage] ?? [];
 
-  async function refreshCachedPages(
-    centerPage: number,
-    currentCache: Record<number, Transaction[]>,
-  ) {
-    const pageSet = new Set(Object.keys(currentCache).map(Number));
-    pageSet.add(centerPage);
-    const min = centerPage - CACHE_WINDOW;
+  async function refreshCachedPages(centerPage: number) {
+    const min = Math.max(1, centerPage - CACHE_WINDOW);
     const max = centerPage + CACHE_WINDOW;
 
-    const newCache: Record<number, Transaction[]> = {};
-    let maxTotal = 0;
+    const offset = (min - 1) * ITEMS_PER_PAGE;
+    const count = (max - min + 1) * ITEMS_PER_PAGE;
 
-    await Promise.all(
-      Array.from(pageSet, async (p) => {
-        if (p < min || p > max) return;
-        const { transactions, totalCount: count } = await getTransactions(
-          p,
-          ITEMS_PER_PAGE,
-        );
-        newCache[p] = transactions;
-        if (count > maxTotal) maxTotal = count;
-      }),
-    );
+    const { transactions, totalCount } = await getTransactions(offset, count);
+
+    const newCache: Record<number, Transaction[]> = {};
+    let page = min;
+    for (let start = 0; start < transactions.length; start += ITEMS_PER_PAGE) {
+      newCache[page++] = transactions.slice(
+        start,
+        Math.min(start + ITEMS_PER_PAGE, transactions.length),
+      );
+    }
 
     setPageCache(newCache);
-    setTotalCount(maxTotal);
+    setTotalCount(totalCount);
   }
 
   async function goToPage(page: number) {
     if (page < 1 || page > totalPages) return;
     if (!pageCache[page]) {
-      await refreshCachedPages(page, pageCache);
+      await refreshCachedPages(page);
     }
     setCurrentPage(page);
   }
 
   useEffect(() => {
     async function load() {
-      const [txnResult, catResult] = await Promise.all([
-        getTransactions(1, ITEMS_PER_PAGE),
-        getCategories(),
-      ]);
-      setPageCache({ 1: txnResult.transactions });
-      setTotalCount(txnResult.totalCount);
-      setCategories(catResult.categories);
+      await refreshCachedPages(1);
+      const { categories } = await getCategories();
+      setCategories(categories);
     }
     load();
   }, []);
@@ -127,10 +117,11 @@ export default function TransactionsPage() {
       await deleteTransaction(id);
       const preDeleteData = pageCache[currentPage] ?? [];
       if (preDeleteData.length === 1 && currentPage > 1) {
-        setCurrentPage(currentPage - 1);
-        await refreshCachedPages(currentPage - 1, pageCache);
+        const targetPage = currentPage - 1;
+        setCurrentPage(targetPage);
+        await refreshCachedPages(targetPage);
       } else {
-        await refreshCachedPages(currentPage, pageCache);
+        await refreshCachedPages(currentPage);
       }
     } catch {
       setDeleteError("Failed to delete transaction");
@@ -171,7 +162,7 @@ export default function TransactionsPage() {
         });
       }
       handleCloseModal();
-      await refreshCachedPages(currentPage, pageCache);
+      await refreshCachedPages(currentPage);
     } catch {
       setError("Failed to save transaction");
     }

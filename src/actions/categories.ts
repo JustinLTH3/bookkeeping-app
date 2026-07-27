@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function getCategories(
-  page?: number,
+  offset?: number,
   limit?: number,
 ): Promise<{
   categories: { id: string; name: string }[];
@@ -16,8 +16,8 @@ export async function getCategories(
 
   const where = { userId: session.user.id };
 
-  if (page !== undefined && limit !== undefined) {
-    const skip = (page - 1) * limit;
+  if (offset !== undefined && limit !== undefined) {
+    const skip = offset;
 
     const [categories, totalCount] = await Promise.all([
       prisma.category.findMany({

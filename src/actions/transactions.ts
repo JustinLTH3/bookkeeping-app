@@ -15,14 +15,14 @@ export type TransactionResponse = {
 };
 
 export async function getTransactions(
-  page = 1,
+  offset = 0,
   limit = 10,
 ): Promise<{ transactions: TransactionResponse[]; totalCount: number }> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
   const where = { userId: session.user.id };
-  const skip = (page - 1) * limit;
+  const skip = offset;
 
   const [rows, totalCount] = await Promise.all([
     prisma.transaction.findMany({

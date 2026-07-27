@@ -75,7 +75,7 @@ describe("getTransactions", () => {
     mockFindMany.mockResolvedValue(transactions);
     mockCount.mockResolvedValue(15);
 
-    const result = await getTransactions(1, 10);
+    const result = await getTransactions(0, 10);
 
     expect(result).toEqual({
       transactions: [
@@ -110,7 +110,7 @@ describe("getTransactions", () => {
     });
   });
 
-  it("defaults to page 1 limit 10", async () => {
+  it("defaults to offset 0 limit 10", async () => {
     mockAuth.mockResolvedValue({ user: { id: "user-1" } });
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
@@ -134,7 +134,7 @@ describe("getTransactions", () => {
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
-    const result = await getTransactions(1, 10);
+    const result = await getTransactions(0, 10);
 
     expect(result).toEqual({ transactions: [], totalCount: 0 });
   });
@@ -156,7 +156,7 @@ describe("getTransactions", () => {
     ]);
     mockCount.mockResolvedValue(1);
 
-    const result = await getTransactions(1, 10);
+    const result = await getTransactions(0, 10);
 
     expect(result.transactions[0].amount).toBe(42.5);
     expect(result.transactions[0].date).toBe("2024-03-15");

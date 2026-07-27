@@ -71,7 +71,7 @@ describe("getCategories", () => {
     expect(mockCount).not.toHaveBeenCalled();
   });
 
-  it("returns paginated categories when page and limit provided", async () => {
+  it("returns paginated categories when offset and limit provided", async () => {
     const categories = [
       { id: "cat-1", name: "Food" },
       { id: "cat-2", name: "Transport" },
@@ -80,7 +80,7 @@ describe("getCategories", () => {
     mockFindMany.mockResolvedValue(categories);
     mockCount.mockResolvedValue(25);
 
-    const result = await getCategories(1, 10);
+    const result = await getCategories(0, 10);
 
     expect(result).toEqual({
       categories,
