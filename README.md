@@ -4,14 +4,57 @@ Personal finance tracking app built with Next.js 16.
 
 ## Tech Stack
 
-| Layer     | Technology                              |
-| --------- | --------------------------------------- |
-| Framework | Next.js 16 (App Router, TypeScript)     |
-| Styling   | Tailwind CSS v4                         |
-| Auth      | Auth.js (NextAuth v5) — Google OAuth     |
-| Database  | PostgreSQL                              |
-| ORM       | Prisma 7                                |
-| Charts    | Chart.js + react-chartjs-2              |
+| Layer      | Technology                                                    |
+| ---------- | ------------------------------------------------------------- |
+| Frontend   | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
+| Backend    | Next.js Route Handlers, server components                     |
+| Database   | PostgreSQL                                                    |
+| ORM        | Prisma 7                                                      |
+| Auth       | Auth.js (NextAuth v5) — Google OAuth                          |
+| Charts     | Chart.js + react-chartjs-2                                    |
+
+## Prerequisites
+
+- **Node.js** >= 22
+- **PostgreSQL** running locally or remotely
+- **npm** (or yarn / pnpm / bun)
+
+## Getting Started
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/JustinLTH3/bookkeeping-app.git
+   cd bookkeeping-app
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Fill in `DATABASE_URL`, `TEST_DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, and `AUTH_GOOGLE_SECRET`.
+
+4. **Set up the database**
+
+   ```bash
+   npx prisma migrate deploy
+   ```
+
+5. **Start the development server**
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
 
 ## Features
 
@@ -20,16 +63,16 @@ Personal finance tracking app built with Next.js 16.
 - **Transactions** — CRUD with server-side pagination, date/category filters
 - **Categories** — CRUD for income and expense categories; defaults created on first signup
 
-## Getting Started
+## Project Structure
 
-```bash
-cp .env.example .env   # fill in DATABASE_URL, AUTH_SECRET, AUTH_GOOGLE_ID, AUTH_GOOGLE_SECRET
-npm install
-npx prisma migrate deploy
-npm run dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000).
+app/              # Next.js App Router pages and API routes
+components/       # React components (auth, dashboard, transactions, categories)
+lib/              # Server helpers (auth, db, validation)
+prisma/           # Prisma schema and migrations
+tests/            # Vitest test suites
+types/            # TypeScript declarations
+```
 
 ## Scripts
 
