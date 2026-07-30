@@ -24,10 +24,11 @@
 
 ## In Progress
 
-| Feature             | Details                                                                                                                                                                                                                               |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit Tests (Vitest) | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`); full transaction CRUD test coverage; all 4 dashboard actions covered in `tests/actions/dashboard.test.ts` |
-| Transactions Page   | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired                                          |
+| Feature                     | Details                                                                                                                                                                                                                               |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit Tests (Vitest)         | Vitest installed; full category CRUD test coverage (`getCategories`, `createCategory`, `deleteCategory`, `renameCategory`); full transaction CRUD test coverage; all 4 dashboard actions covered in `tests/actions/dashboard.test.ts` |
+| Transactions Page           | `src/app/transactions/` — mock data removed; server actions for `getTransactions` and `createTransaction` in `src/actions/transactions.ts`; client fetches categories from server; add wired                                          |
+| Transaction Scale Test      | `tests/integration/transactions.scale.test.ts` — 50k-row scale test (env-overridable via `SCALE_ROWS`) with pagination, CRUD, multi-tenancy, and performance regression guards (`TIME_CEILING_MS = 15_000`)                           |
 
 ## Complete (cont.)
 
