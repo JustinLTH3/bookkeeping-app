@@ -28,14 +28,14 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockRequireUserId } = vi.hoisted(() => ({ mockRequireUserId: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 function asUser(id: string) {
-  mockAuth.mockResolvedValue({ user: { id } });
+  mockRequireUserId.mockResolvedValue(id);
 }
 
 beforeEach(async () => {
@@ -44,7 +44,7 @@ beforeEach(async () => {
   // instant; setTimeout/setInterval stay real for the pg driver.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date());
-  mockAuth.mockReset();
+  mockRequireUserId.mockReset();
   await truncateAll();
 });
 

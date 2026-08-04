@@ -19,10 +19,10 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockRequireUserId } = vi.hoisted(() => ({ mockRequireUserId: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 const SCALE_ROWS = Number(process.env.SCALE_ROWS ?? 50_000);
@@ -129,7 +129,7 @@ beforeAll(async () => {
     await prisma.transaction.createMany({ data: batch });
   }
 
-  mockAuth.mockResolvedValue({ user: { id: userId } });
+  mockRequireUserId.mockResolvedValue(userId);
 }, 60_000);
 
 afterAll(async () => {
@@ -207,7 +207,7 @@ describe("dashboard at scale", () => {
         },
       });
 
-      mockAuth.mockResolvedValue({ user: { id: userB.id } });
+      mockRequireUserId.mockResolvedValue(userB.id);
 
       const summary = await getDashboardSummary("monthly");
       expect(summary.netBalance).toBe(-7);
@@ -216,7 +216,7 @@ describe("dashboard at scale", () => {
       expect(recent).toHaveLength(1);
       expect(recent[0].description).toBe("B lunch");
 
-      mockAuth.mockResolvedValue({ user: { id: userId } });
+      mockRequireUserId.mockResolvedValue(userId);
     },
   );
 });
