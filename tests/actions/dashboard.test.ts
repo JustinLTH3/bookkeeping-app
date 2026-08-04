@@ -11,14 +11,14 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockAuth, mockQueryRaw, mockFindMany } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+const { mockRequireUserId, mockQueryRaw, mockFindMany } = vi.hoisted(() => ({
+  mockRequireUserId: vi.fn(),
   mockQueryRaw: vi.fn(),
   mockFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -43,7 +43,7 @@ describe("getDashboardSummary", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     mockQueryRaw.mockResolvedValue([
       {
@@ -68,14 +68,14 @@ describe("getDashboardSummary", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getDashboardSummary()).rejects.toThrow("Unauthorized");
     expect(mockQueryRaw).not.toHaveBeenCalled();
   });
 
   it("returns zeros when no transactions exist", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockQueryRaw.mockResolvedValue([
       {
         net_balance: "0",
@@ -97,7 +97,7 @@ describe("getDashboardSummary", () => {
   });
 
   it("propagates Prisma errors", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
     mockQueryRaw.mockRejectedValue(error);
 
@@ -116,7 +116,7 @@ describe("getExpensesByCategory", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     mockFindMany.mockResolvedValue([
       { amount: new Prisma.Decimal(-50), category: { name: "Food" } },
@@ -145,7 +145,7 @@ describe("getExpensesByCategory", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getExpensesByCategory("monthly")).rejects.toThrow(
       "Unauthorized",
@@ -154,7 +154,7 @@ describe("getExpensesByCategory", () => {
   });
 
   it("returns empty array when no expenses", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
 
     const result = await getExpensesByCategory("monthly");
@@ -166,7 +166,7 @@ describe("getExpensesByCategory", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
 
     await getExpensesByCategory();
@@ -182,7 +182,7 @@ describe("getExpensesByCategory", () => {
   });
 
   it("propagates Prisma errors", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
     mockFindMany.mockRejectedValue(error);
 
@@ -201,7 +201,7 @@ describe("getCashFlow", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     mockFindMany.mockResolvedValue([
       { amount: new Prisma.Decimal(100), date: new Date("2024-06-12") },
@@ -230,7 +230,7 @@ describe("getCashFlow", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getCashFlow("weekly")).rejects.toThrow("Unauthorized");
     expect(mockFindMany).not.toHaveBeenCalled();
@@ -240,7 +240,7 @@ describe("getCashFlow", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
 
     const result = await getCashFlow("weekly");
@@ -253,7 +253,7 @@ describe("getCashFlow", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([
       { amount: new Prisma.Decimal(50), date: new Date("2024-06-10") },
       { amount: new Prisma.Decimal(50), date: new Date("2024-06-15") },
@@ -273,7 +273,7 @@ describe("getCashFlow", () => {
   });
 
   it("propagates Prisma errors", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
     mockFindMany.mockRejectedValue(error);
 
@@ -285,7 +285,7 @@ describe("getCashFlow", () => {
 
 describe("getRecentTransactions", () => {
   it("returns 5 most recent with mapped fields", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     mockFindMany.mockResolvedValue([
       {
@@ -352,14 +352,14 @@ describe("getRecentTransactions", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getRecentTransactions()).rejects.toThrow("Unauthorized");
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
   it("returns empty array when no transactions", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
 
     const result = await getRecentTransactions();
@@ -368,7 +368,7 @@ describe("getRecentTransactions", () => {
   });
 
   it("maps Decimal amount to number and formats date", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([
       {
         id: "txn-1",
@@ -386,7 +386,7 @@ describe("getRecentTransactions", () => {
   });
 
   it("propagates Prisma errors", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
     mockFindMany.mockRejectedValue(error);
 

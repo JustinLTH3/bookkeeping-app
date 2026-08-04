@@ -1,9 +1,10 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import dayjs from "dayjs";
+import { z } from "zod";
 
 export type TransactionResponse = {
   id: string;
@@ -14,20 +15,31 @@ export type TransactionResponse = {
   category: { id: string; name: string };
 };
 
+const TransactionInput = z.object({
+  amount: z.preprocess(
+    (v) => (typeof v === "number" && (isNaN(v) || v === 0) ? 0 : v),
+    z.number().refine((v) => v !== 0, {
+      message: "Amount must be a non-zero number",
+    }),
+  ),
+  description: z.string().nullable(),
+  date: z.string().min(1, "Date is required"),
+  categoryId: z.string().min(1, "Category is required"),
+});
+
 export async function getTransactions(
   offset = 0,
   limit = 10,
 ): Promise<{ transactions: TransactionResponse[]; totalCount: number }> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  const where = { userId: session.user.id };
+  const where = { userId };
   const skip = offset;
 
   const [rows, totalCount] = await Promise.all([
     prisma.transaction.findMany({
       where,
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { id: "desc" }],
       skip,
       take: limit,
       include: { category: { select: { id: true, name: true } } },
@@ -53,26 +65,20 @@ export async function createTransaction(data: {
   date: string;
   categoryId: string;
 }): Promise<TransactionResponse> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  if (!data.amount || isNaN(data.amount) || data.amount === 0) {
-    throw new Error("Amount must be a non-zero number");
-  }
-  if (!data.date) {
-    throw new Error("Date is required");
-  }
-  if (!data.categoryId) {
-    throw new Error("Category is required");
-  }
+  const parsed = TransactionInput.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const { amount, description, date, categoryId } = parsed.data;
 
   const transaction = await prisma.transaction.create({
     data: {
-      amount: data.amount,
-      description: data.description,
-      date: dayjs(data.date).toDate(),
-      userId: session.user.id,
-      categoryId: data.categoryId,
+      amount,
+      description,
+      date: dayjs(date).toDate(),
+      userId,
+      categoryId,
     },
     include: { category: { select: { id: true, name: true } } },
   });
@@ -99,26 +105,20 @@ export async function updateTransaction(
     categoryId: string;
   },
 ): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  if (!data.amount || isNaN(data.amount) || data.amount === 0) {
-    throw new Error("Amount must be a non-zero number");
-  }
-  if (!data.date) {
-    throw new Error("Date is required");
-  }
-  if (!data.categoryId) {
-    throw new Error("Category is required");
-  }
+  const parsed = TransactionInput.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const { amount, description, date, categoryId } = parsed.data;
 
   await prisma.transaction.update({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: {
-      amount: data.amount,
-      description: data.description,
-      date: dayjs(data.date).toDate(),
-      categoryId: data.categoryId,
+      amount,
+      description,
+      date: dayjs(date).toDate(),
+      categoryId,
     },
   });
 
@@ -127,11 +127,10 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
   await prisma.transaction.delete({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
   });
 
   revalidatePath("/transactions");

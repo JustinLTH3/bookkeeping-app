@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import dayjs from "dayjs";
@@ -109,9 +109,8 @@ async function _getDashboardSummary(
 export async function getDashboardSummary(
   timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
 ): Promise<SummaryData> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getDashboardSummary(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getDashboardSummary(userId, timeRange);
 }
 
 function getStartDate(
@@ -160,9 +159,8 @@ async function _getExpensesByCategory(
 export async function getExpensesByCategory(
   timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
 ): Promise<CategoryExpense[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getExpensesByCategory(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getExpensesByCategory(userId, timeRange);
 }
 
 async function _getCashFlow(
@@ -203,9 +201,8 @@ async function _getCashFlow(
 export async function getCashFlow(
   timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
 ): Promise<CashFlowPoint[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getCashFlow(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getCashFlow(userId, timeRange);
 }
 
 async function _getRecentTransactions(
@@ -234,9 +231,8 @@ async function _getRecentTransactions(
 }
 
 export async function getRecentTransactions(): Promise<RecentTransaction[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getRecentTransactions(session.user.id);
+  const userId = await requireUserId();
+  return _getRecentTransactions(userId);
 }
 
 export type DashboardData = {
@@ -249,10 +245,7 @@ export type DashboardData = {
 export async function getDashboardData(
   timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
 ): Promise<DashboardData> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
-  const userId = session.user.id;
+  const userId = await requireUserId();
 
   const [summary, expensesByCategory, cashFlow, recentTransactions] =
     await Promise.all([
