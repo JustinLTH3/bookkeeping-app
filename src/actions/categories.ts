@@ -15,6 +15,11 @@ const CategoryInput = z.object({
   name: nonEmptyTrimmed,
 });
 
+function revalidateCategoryPaths() {
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+}
+
 export async function getCategories(
   offset?: number,
   limit?: number,
@@ -63,8 +68,7 @@ export async function createCategory(data: { name: string }) {
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }
 
@@ -76,8 +80,7 @@ export async function deleteCategory(id: string) {
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }
 
@@ -93,7 +96,6 @@ export async function renameCategory(data: { id: string; name: string }) {
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }

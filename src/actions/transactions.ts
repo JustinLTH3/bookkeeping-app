@@ -59,6 +59,13 @@ export async function getTransactions(
   return { transactions, totalCount };
 }
 
+async function validateCategoryOwnership(categoryId: string, userId: string) {
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, userId },
+  });
+  if (!category) throw new Error("Category not found");
+}
+
 export async function createTransaction(data: {
   amount: number;
   description: string | null;
@@ -71,6 +78,8 @@ export async function createTransaction(data: {
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const { amount, description, date, categoryId } = parsed.data;
+
+  await validateCategoryOwnership(categoryId, userId);
 
   const transaction = await prisma.transaction.create({
     data: {
@@ -111,6 +120,8 @@ export async function updateTransaction(
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const { amount, description, date, categoryId } = parsed.data;
+
+  await validateCategoryOwnership(categoryId, userId);
 
   await prisma.transaction.update({
     where: { id, userId },

@@ -9,6 +9,7 @@ import {
 const {
   mockRequireUserId,
   mockFindMany,
+  mockFindFirst,
   mockCreate,
   mockUpdate,
   mockDelete,
@@ -17,6 +18,7 @@ const {
 } = vi.hoisted(() => ({
   mockRequireUserId: vi.fn(),
   mockFindMany: vi.fn(),
+  mockFindFirst: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdate: vi.fn(),
   mockDelete: vi.fn(),
@@ -30,6 +32,9 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    category: {
+      findFirst: mockFindFirst,
+    },
     transaction: {
       findMany: mockFindMany,
       create: mockCreate,
@@ -183,6 +188,7 @@ describe("createTransaction", () => {
     };
 
     mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-1", name: "Food" });
     mockCreate.mockResolvedValue(created);
 
     const result = await createTransaction(validData);
@@ -252,9 +258,20 @@ describe("createTransaction", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it("throws Category not found when category does not belong to user", async () => {
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue(null);
+
+    await expect(
+      createTransaction({ ...validData, categoryId: "cat-other-user" }),
+    ).rejects.toThrow("Category not found");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("propagates Prisma errors", async () => {
     const error = new Error("Unique constraint failed");
     mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-1", name: "Food" });
     mockCreate.mockRejectedValue(error);
 
     await expect(createTransaction(validData)).rejects.toThrow(
@@ -275,6 +292,7 @@ describe("updateTransaction", () => {
 
   it("updates a transaction for authenticated user", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-2", name: "Transport" });
     mockUpdate.mockResolvedValue({});
 
     await updateTransaction(txnId, validData);
@@ -337,9 +355,20 @@ describe("updateTransaction", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("throws Category not found when category does not belong to user", async () => {
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue(null);
+
+    await expect(
+      updateTransaction(txnId, { ...validData, categoryId: "cat-other-user" }),
+    ).rejects.toThrow("Category not found");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("propagates Prisma errors (record not found)", async () => {
     const error = new Error("Record to update does not exist");
     mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-2", name: "Transport" });
     mockUpdate.mockRejectedValue(error);
 
     await expect(updateTransaction(txnId, validData)).rejects.toThrow(
