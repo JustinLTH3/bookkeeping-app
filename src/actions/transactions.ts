@@ -59,6 +59,11 @@ export async function getTransactions(
   return { transactions, totalCount };
 }
 
+function revalidateTransactionPaths() {
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
 async function validateCategoryOwnership(categoryId: string, userId: string) {
   const category = await prisma.category.findFirst({
     where: { id: categoryId, userId },
@@ -92,8 +97,7 @@ export async function createTransaction(data: {
     include: { category: { select: { id: true, name: true } } },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 
   return {
     id: transaction.id,
@@ -133,8 +137,7 @@ export async function updateTransaction(
     },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
@@ -144,6 +147,5 @@ export async function deleteTransaction(id: string): Promise<void> {
     where: { id, userId },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 }
