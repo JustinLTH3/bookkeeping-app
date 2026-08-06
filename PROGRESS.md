@@ -22,6 +22,7 @@
 | Category CRUD             | Server actions + page for create, read, update, delete; CategoryTable with functional Edit/Delete buttons; error handling on delete                          |
 | Default Categories        | Default categories (Food, Transport, Housing, Utilities, Entertainment, Salary, Other) auto-created via Auth.js `events.createUser` on first signup          |
 | Currency Formatting       | `src/lib/currency.ts` — shared `formatCurrency` using hoisted `Intl.NumberFormat("en-US",{style:"currency",currency:"USD",signDisplay:"exceptZero"})`; replaces duplicated inline formatters and literal `$`+`toFixed` code across dashboard, TransactionTable, PieChart tooltip, and LineChart tooltip/y-axis |
+| Pie Chart Unique Colors   | PieChart assigns each category a deterministic golden-angle-spaced HSL color via `stringHash(categoryName)` — colors are stable per category, never repeat regardless of category count or sort order; total for tooltip percentages computed once outside the label callback |
 
 ## In Progress
 
