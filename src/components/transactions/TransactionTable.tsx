@@ -1,5 +1,6 @@
 import type { Transaction } from "@/app/(app)/transactions/page";
 import dayjs from "dayjs";
+import { formatCurrency } from "@/lib/currency";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -37,10 +38,6 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
         <tbody className="divide-y divide-neutral">
           {transactions.map((transaction) => {
             const isIncome = transaction.amount >= 0;
-            const formatted = new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-            }).format(Math.abs(transaction.amount));
 
             return (
               <tr key={transaction.id} className="hover:bg-neutral/50">
@@ -58,8 +55,7 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                     isIncome ? "text-secondary" : "text-red-600"
                   }`}
                 >
-                  {isIncome ? "+" : "-"}
-                  {formatted}
+                  {formatCurrency(transaction.amount)}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="flex flex-row items-center gap-1">

@@ -7,6 +7,7 @@ import { PieChart } from "@/components/charts/PieChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { getDashboardData } from "@/actions/dashboard";
 import type { DashboardData } from "@/actions/dashboard";
+import { formatCurrency } from "@/lib/currency";
 
 const TIME_RANGES = [
   { value: "weekly", label: "Weekly" },
@@ -15,13 +16,6 @@ const TIME_RANGES = [
   { value: "yearly", label: "Yearly" },
   { value: "ytd", label: "Year to Date" },
 ] as const;
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(Math.abs(value));
-}
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -85,13 +79,13 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Income</span>
                   <span className="text-sm font-medium text-secondary">
-                    +{formatCurrency(data.summary.weekIncome)}
+                    {formatCurrency(data.summary.weekIncome)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Expense</span>
                   <span className="text-sm font-medium text-red-600">
-                    -{formatCurrency(data.summary.weekExpense)}
+                    {formatCurrency(data.summary.weekExpense)}
                   </span>
                 </div>
               </>
@@ -106,7 +100,6 @@ export default function DashboardPage() {
                 data.summary.netBalance >= 0 ? "text-secondary" : "text-red-600"
               }`}
             >
-              {data.summary.netBalance >= 0 ? "+" : "-"}
               {formatCurrency(data.summary.netBalance)}
             </p>
           )}
@@ -123,7 +116,6 @@ export default function DashboardPage() {
                   : "text-red-600"
               }`}
             >
-              {data.summary.periodNetFlow >= 0 ? "+" : "-"}
               {formatCurrency(data.summary.periodNetFlow)}
             </p>
           )}
@@ -216,7 +208,6 @@ export default function DashboardPage() {
                           isIncome ? "text-secondary" : "text-red-600"
                         }`}
                       >
-                        {isIncome ? "+" : "-"}
                         {formatCurrency(t.amount)}
                       </td>
                     </tr>

@@ -2,6 +2,7 @@
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Pie } from "react-chartjs-2";
+import { formatCurrency } from "@/lib/currency";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -59,7 +60,7 @@ export function PieChart({ data }: Props) {
                     );
                     const pct =
                       total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
-                    return ` $${value.toFixed(2)} (${pct}%)`;
+                    return ` ${formatCurrency(value)} (${pct}%)`;
                   },
                 },
               },

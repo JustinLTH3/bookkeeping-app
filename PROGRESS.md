@@ -21,6 +21,7 @@
 | Color Scheme              | Custom tokens: `--color-primary`, `--color-secondary`, `--color-tertiary`, `--color-neutral`                                                                 |
 | Category CRUD             | Server actions + page for create, read, update, delete; CategoryTable with functional Edit/Delete buttons; error handling on delete                          |
 | Default Categories        | Default categories (Food, Transport, Housing, Utilities, Entertainment, Salary, Other) auto-created via Auth.js `events.createUser` on first signup          |
+| Currency Formatting       | `src/lib/currency.ts` — shared `formatCurrency` using hoisted `Intl.NumberFormat("en-US",{style:"currency",currency:"USD",signDisplay:"exceptZero"})`; replaces duplicated inline formatters and literal `$`+`toFixed` code across dashboard, TransactionTable, PieChart tooltip, and LineChart tooltip/y-axis |
 
 ## In Progress
 
@@ -54,4 +55,3 @@
 | -------------------------- | ------------------------------------------------------ |
 | Category Integration Tests | Category CRUD server actions — setup exists, tests TBD |
 | E2E Tests (Playwright)     | Not installed, no config, no test files                |
-| Lib Utilities              | No formatting, validation, or helper utilities         |
