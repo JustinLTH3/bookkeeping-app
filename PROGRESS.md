@@ -16,13 +16,15 @@
 | Project Config            | `next.config.ts`, `tsconfig.json`, `eslint`, `prettier`, `postcss`                                                                                           |
 | Environment               | `.env` with `DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`                                                                            |
 | App Layout                | `src/app/(app)/layout.tsx` — authed shell with sidebar + content area                                                                                        |
-| Sidebar                   | `src/components/layout/Sidebar.tsx` — nav links (Dashboard, Transactions, Categories), active state, sign out                                                |
+| Sidebar                   | `src/components/layout/Sidebar.tsx` — nav links (Dashboard, Transactions, Categories), active state, sign out; accepts `isOpen`/`onClose` props              |
+| Responsive Shell          | `src/components/layout/AppShell.tsx` — owns drawer state; on mobile the sidebar is hidden and slides in as an overlay via the "Menu" button (backdrop click, nav-link click, or Escape closes it); desktop keeps the persistent sidebar |
 | Pagination                | `src/components/ui/Pagination.tsx` — Prev/Next, page numbers with ellipsis, "Page X of Y" indicator                                                          |
 | Color Scheme              | Custom tokens: `--color-primary`, `--color-secondary`, `--color-tertiary`, `--color-neutral`                                                                 |
 | Category CRUD             | Server actions + page for create, read, update, delete; CategoryTable with functional Edit/Delete buttons; error handling on delete                          |
 | Default Categories        | Default categories (Food, Transport, Housing, Utilities, Entertainment, Salary, Other) auto-created via Auth.js `events.createUser` on first signup          |
 | Currency Formatting       | `src/lib/currency.ts` — shared `formatCurrency` using hoisted `Intl.NumberFormat("en-US",{style:"currency",currency:"USD",signDisplay:"exceptZero"})`; replaces duplicated inline formatters and literal `$`+`toFixed` code across dashboard, TransactionTable, PieChart tooltip, and LineChart tooltip/y-axis |
 | Pie Chart Unique Colors   | PieChart assigns each category a deterministic golden-angle-spaced HSL color via `stringHash(categoryName)` — colors are stable per category, never repeat regardless of category count or sort order; total for tooltip percentages computed once outside the label callback |
+| Pie Chart Resize Fix      | PieChart container changed `w-full max-w-sm` → `aspect-square w-full max-w-sm` — fixes Chart.js #11005 (v4 `maintainAspectRatio` height clamp ratchets down but never grows back when the container height is derived from the canvas); container height is now CSS-driven so the chart grows back on window resize-up |
 
 ## In Progress
 

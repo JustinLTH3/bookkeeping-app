@@ -1,6 +1,6 @@
 "use client";
 
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartData } from "chart.js";
 import { Pie } from "react-chartjs-2";
 import { formatCurrency } from "@/lib/currency";
 
@@ -28,7 +28,7 @@ type Props = {
 export function PieChart({ data }: Props) {
   const total = data.reduce((s, d) => s + Math.abs(d.total), 0);
 
-  const chartData = {
+  const chartData: ChartData<"pie", number[], string> = {
     labels: data.map((d) => d.categoryName),
     datasets: [
       {
@@ -41,7 +41,7 @@ export function PieChart({ data }: Props) {
 
   return (
     <div className="flex justify-center">
-      <div className="w-full max-w-sm">
+      <div className="aspect-square w-full max-w-sm">
         <Pie
           data={chartData}
           options={{
@@ -57,7 +57,7 @@ export function PieChart({ data }: Props) {
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    const value = ctx.parsed as number;
+                    const value = ctx.parsed;
                     const pct =
                       total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
                     return ` ${formatCurrency(value)} (${pct}%)`;
