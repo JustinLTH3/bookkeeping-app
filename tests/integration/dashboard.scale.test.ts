@@ -102,6 +102,7 @@ beforeAll(async () => {
         from: monthStart.toDate(),
         to: monthEnd.toDate(),
       });
+      const dateOnly = dayjs(date).format("YYYY-MM-DD");
       const description =
         i % 7 === 0 ? faker.commerce.productName() : undefined;
 
@@ -120,7 +121,7 @@ beforeAll(async () => {
         userId,
         categoryId: categoryIds[catIdx],
         amount,
-        date,
+        date: new Date(`${dateOnly}T00:00:00.000Z`),
         description,
         createdAt: frozenNow,
         updatedAt: frozenNow,

@@ -11,11 +11,17 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockRequireUserId, mockQueryRaw, mockFindMany } = vi.hoisted(() => ({
-  mockRequireUserId: vi.fn(),
-  mockQueryRaw: vi.fn(),
-  mockFindMany: vi.fn(),
-}));
+const { mockRequireUserId, mockQueryRawTyped, mockFindMany, mockSqlFns } =
+  vi.hoisted(() => ({
+    mockRequireUserId: vi.fn(),
+    mockQueryRawTyped: vi.fn(),
+    mockFindMany: vi.fn(),
+    mockSqlFns: {
+      dashboardSummary: vi.fn(() => ({ query: "dashboardSummary" })),
+      expensesByCategory: vi.fn(() => ({ query: "expensesByCategory" })),
+      cashFlowByDay: vi.fn(() => ({ query: "cashFlowByDay" })),
+    },
+  }));
 
 vi.mock("@/lib/auth", () => ({
   requireUserId: mockRequireUserId,
@@ -23,12 +29,14 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    $queryRaw: mockQueryRaw,
+    $queryRawTyped: mockQueryRawTyped,
     transaction: {
       findMany: mockFindMany,
     },
   },
 }));
+
+vi.mock("@/generated/prisma/sql", () => mockSqlFns);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,7 +53,7 @@ describe("getDashboardSummary", () => {
 
     mockRequireUserId.mockResolvedValue("user-1");
 
-    mockQueryRaw.mockResolvedValue([
+    mockQueryRawTyped.mockResolvedValue([
       {
         net_balance: "295.00",
         week_income: "100.00",
@@ -64,19 +72,24 @@ describe("getDashboardSummary", () => {
       periodLabel: "Monthly",
     });
 
-    expect(mockQueryRaw).toHaveBeenCalledOnce();
+    expect(mockQueryRawTyped).toHaveBeenCalledOnce();
+    expect(mockSqlFns.dashboardSummary).toHaveBeenCalledWith(
+      "user-1",
+      new Date(`${dayjs().startOf("isoWeek").format("YYYY-MM-DD")}T00:00:00.000Z`),
+      new Date(`${dayjs().startOf("month").format("YYYY-MM-DD")}T00:00:00.000Z`),
+    );
   });
 
   it("throws Unauthorized when no session", async () => {
     mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getDashboardSummary()).rejects.toThrow("Unauthorized");
-    expect(mockQueryRaw).not.toHaveBeenCalled();
+    expect(mockQueryRawTyped).not.toHaveBeenCalled();
   });
 
   it("returns zeros when no transactions exist", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
-    mockQueryRaw.mockResolvedValue([
+    mockQueryRawTyped.mockResolvedValue([
       {
         net_balance: "0",
         week_income: "0",
@@ -99,7 +112,7 @@ describe("getDashboardSummary", () => {
   it("propagates Prisma errors", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
-    mockQueryRaw.mockRejectedValue(error);
+    mockQueryRawTyped.mockRejectedValue(error);
 
     await expect(getDashboardSummary()).rejects.toThrow(
       "Database connection failed",
@@ -118,11 +131,10 @@ describe("getExpensesByCategory", () => {
 
     mockRequireUserId.mockResolvedValue("user-1");
 
-    mockFindMany.mockResolvedValue([
-      { amount: new Prisma.Decimal(-50), category: { name: "Food" } },
-      { amount: new Prisma.Decimal(-30), category: { name: "Transport" } },
-      { amount: new Prisma.Decimal(-20), category: { name: "Food" } },
-      { amount: new Prisma.Decimal(-100), category: { name: "Entertainment" } },
+    mockQueryRawTyped.mockResolvedValue([
+      { name: "Entertainment", total: "-100" },
+      { name: "Food", total: "-70" },
+      { name: "Transport", total: "-30" },
     ]);
 
     const result = await getExpensesByCategory("monthly");
@@ -133,15 +145,11 @@ describe("getExpensesByCategory", () => {
       { categoryName: "Transport", total: -30 },
     ]);
 
-    const expectedStart = dayjs().startOf("month").toDate();
-    expect(mockFindMany).toHaveBeenCalledWith({
-      where: {
-        userId: "user-1",
-        date: { gte: expectedStart },
-        amount: { lt: 0 },
-      },
-      select: { amount: true, category: { select: { name: true } } },
-    });
+    expect(mockQueryRawTyped).toHaveBeenCalledOnce();
+    expect(mockSqlFns.expensesByCategory).toHaveBeenCalledWith(
+      "user-1",
+      new Date(`${dayjs().startOf("month").format("YYYY-MM-DD")}T00:00:00.000Z`),
+    );
   });
 
   it("throws Unauthorized when no session", async () => {
@@ -150,12 +158,12 @@ describe("getExpensesByCategory", () => {
     await expect(getExpensesByCategory("monthly")).rejects.toThrow(
       "Unauthorized",
     );
-    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockQueryRawTyped).not.toHaveBeenCalled();
   });
 
   it("returns empty array when no expenses", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
-    mockFindMany.mockResolvedValue([]);
+    mockQueryRawTyped.mockResolvedValue([]);
 
     const result = await getExpensesByCategory("monthly");
 
@@ -167,24 +175,20 @@ describe("getExpensesByCategory", () => {
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
     mockRequireUserId.mockResolvedValue("user-1");
-    mockFindMany.mockResolvedValue([]);
+    mockQueryRawTyped.mockResolvedValue([]);
 
     await getExpensesByCategory();
 
-    const expectedStart = dayjs().startOf("month").toDate();
-    expect(mockFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          date: { gte: expectedStart },
-        }),
-      }),
+    expect(mockSqlFns.expensesByCategory).toHaveBeenCalledWith(
+      "user-1",
+      new Date(`${dayjs().startOf("month").format("YYYY-MM-DD")}T00:00:00.000Z`),
     );
   });
 
   it("propagates Prisma errors", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
-    mockFindMany.mockRejectedValue(error);
+    mockQueryRawTyped.mockRejectedValue(error);
 
     await expect(getExpensesByCategory("monthly")).rejects.toThrow(
       "Database connection failed",
@@ -203,10 +207,9 @@ describe("getCashFlow", () => {
 
     mockRequireUserId.mockResolvedValue("user-1");
 
-    mockFindMany.mockResolvedValue([
-      { amount: new Prisma.Decimal(100), date: new Date("2024-06-12") },
-      { amount: new Prisma.Decimal(-50), date: new Date("2024-06-14") },
-      { amount: new Prisma.Decimal(30), date: new Date("2024-06-14") },
+    mockQueryRawTyped.mockResolvedValue([
+      { day: new Date("2024-06-12"), total: "100" },
+      { day: new Date("2024-06-14"), total: "-20" },
     ]);
 
     const result = await getCashFlow("weekly");
@@ -221,19 +224,20 @@ describe("getCashFlow", () => {
       { date: "2024-06-16", balance: 80 },
     ]);
 
-    const expectedStart = dayjs().startOf("isoWeek").toDate();
-    expect(mockFindMany).toHaveBeenCalledWith({
-      where: { userId: "user-1", date: { gte: expectedStart } },
-      orderBy: { date: "asc" },
-      select: { amount: true, date: true },
-    });
+    expect(mockQueryRawTyped).toHaveBeenCalledOnce();
+    expect(mockSqlFns.cashFlowByDay).toHaveBeenCalledWith(
+      "user-1",
+      new Date(
+        `${dayjs().startOf("isoWeek").format("YYYY-MM-DD")}T00:00:00.000Z`,
+      ),
+    );
   });
 
   it("throws Unauthorized when no session", async () => {
     mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getCashFlow("weekly")).rejects.toThrow("Unauthorized");
-    expect(mockFindMany).not.toHaveBeenCalled();
+    expect(mockQueryRawTyped).not.toHaveBeenCalled();
   });
 
   it("returns zero-filled series when no transactions", async () => {
@@ -241,7 +245,7 @@ describe("getCashFlow", () => {
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
     mockRequireUserId.mockResolvedValue("user-1");
-    mockFindMany.mockResolvedValue([]);
+    mockQueryRawTyped.mockResolvedValue([]);
 
     const result = await getCashFlow("weekly");
 
@@ -254,9 +258,9 @@ describe("getCashFlow", () => {
     vi.setSystemTime(new Date("2024-06-15T12:00:00Z"));
 
     mockRequireUserId.mockResolvedValue("user-1");
-    mockFindMany.mockResolvedValue([
-      { amount: new Prisma.Decimal(50), date: new Date("2024-06-10") },
-      { amount: new Prisma.Decimal(50), date: new Date("2024-06-15") },
+    mockQueryRawTyped.mockResolvedValue([
+      { day: new Date("2024-06-10"), total: "50" },
+      { day: new Date("2024-06-15"), total: "50" },
     ]);
 
     const result = await getCashFlow("weekly");
@@ -275,7 +279,7 @@ describe("getCashFlow", () => {
   it("propagates Prisma errors", async () => {
     mockRequireUserId.mockResolvedValue("user-1");
     const error = new Error("Database connection failed");
-    mockFindMany.mockRejectedValue(error);
+    mockQueryRawTyped.mockRejectedValue(error);
 
     await expect(getCashFlow("weekly")).rejects.toThrow(
       "Database connection failed",
@@ -339,7 +343,7 @@ describe("getRecentTransactions", () => {
 
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
       take: 5,
       select: {
         id: true,

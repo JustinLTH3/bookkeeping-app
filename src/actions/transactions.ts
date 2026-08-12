@@ -90,7 +90,7 @@ export async function createTransaction(data: {
     data: {
       amount,
       description,
-      date: dayjs(date).toDate(),
+      date: new Date(`${date}T00:00:00.000Z`),
       userId,
       categoryId,
     },
@@ -132,7 +132,7 @@ export async function updateTransaction(
     data: {
       amount,
       description,
-      date: dayjs(date).toDate(),
+      date: new Date(`${date}T00:00:00.000Z`),
       categoryId,
     },
   });

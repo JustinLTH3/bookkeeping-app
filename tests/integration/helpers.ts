@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { expect } from "vitest";
 import { faker } from "@faker-js/faker";
+import dayjs from "dayjs";
 
 export { faker };
 
@@ -24,8 +25,16 @@ export function createTransaction(
   date: Date,
   description?: string,
 ) {
+  // DATE column: normalize to UTC midnight of the date's local calendar day
+  const dateOnly = dayjs(date).format("YYYY-MM-DD");
   return prisma.transaction.create({
-    data: { userId, categoryId, amount, date, description },
+    data: {
+      userId,
+      categoryId,
+      amount,
+      date: new Date(`${dateOnly}T00:00:00.000Z`),
+      description,
+    },
   });
 }
 
