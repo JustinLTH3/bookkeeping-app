@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import type { Resolver } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { TransactionTable } from "@/components/transactions/TransactionTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -10,19 +13,18 @@ import {
   updateTransaction,
   deleteTransaction,
 } from "@/actions/transactions";
+import type { Transaction } from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
+import type { Category } from "@/actions/categories";
+import { TransactionSchema } from "@/lib/schemas";
 import dayjs from "dayjs";
 
-export type Transaction = {
-  id: string;
+type TransactionFormValues = {
   amount: number;
-  description: string | null;
   date: string;
   categoryId: string;
-  category: { id: string; name: string };
+  description: string | null;
 };
-
-type Category = { id: string; name: string };
 
 const ITEMS_PER_PAGE = 10;
 const CACHE_WINDOW = 2;
@@ -36,13 +38,26 @@ export default function TransactionsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] =
     useState<Transaction | null>(null);
-
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(dayjs().format("YYYY-MM-DD"));
-  const [categoryId, setCategoryId] = useState("");
-  const [description, setDescription] = useState("");
-  const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    clearErrors,
+    formState: { errors },
+  } = useForm<TransactionFormValues>({
+    resolver: zodResolver(TransactionSchema) as unknown as Resolver<TransactionFormValues>,
+    defaultValues: {
+      amount: undefined,
+      date: dayjs().format("YYYY-MM-DD"),
+      categoryId: "",
+      description: "",
+    },
+  });
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const displayData = pageCache[currentPage] ?? [];
@@ -88,21 +103,25 @@ export default function TransactionsPage() {
 
   function handleOpenAddModal() {
     setEditingTransaction(null);
-    setAmount("");
-    setDate(dayjs().format("YYYY-MM-DD"));
-    setCategoryId(categories[0]?.id ?? "");
-    setDescription("");
-    setError("");
+    reset({
+      amount: undefined,
+      date: dayjs().format("YYYY-MM-DD"),
+      categoryId: categories[0]?.id ?? "",
+      description: "",
+    });
+    clearErrors();
     setIsModalOpen(true);
   }
 
   function handleOpenEditModal(transaction: Transaction) {
     setEditingTransaction(transaction);
-    setAmount(transaction.amount.toString());
-    setDate(dayjs(transaction.date).format("YYYY-MM-DD"));
-    setCategoryId(transaction.categoryId);
-    setDescription(transaction.description || "");
-    setError("");
+    reset({
+      amount: transaction.amount,
+      date: dayjs(transaction.date).format("YYYY-MM-DD"),
+      categoryId: transaction.categoryId,
+      description: transaction.description,
+    });
+    clearErrors();
     setIsModalOpen(true);
   }
 
@@ -113,6 +132,7 @@ export default function TransactionsPage() {
 
   async function handleDelete(id: string) {
     setDeleteError("");
+    setDeletingId(id);
     try {
       await deleteTransaction(id);
       const preDeleteData = pageCache[currentPage] ?? [];
@@ -125,46 +145,35 @@ export default function TransactionsPage() {
       }
     } catch {
       setDeleteError("Failed to delete transaction");
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  async function handleSave() {
-    setError("");
-
-    const numAmount = parseFloat(amount);
-    if (!amount || isNaN(numAmount) || numAmount === 0) {
-      setError("Amount must be a non-zero number");
-      return;
-    }
-    if (!date) {
-      setError("Date is required");
-      return;
-    }
-    if (!categoryId) {
-      setError("Category is required");
-      return;
-    }
-
+  async function handleSave(values: TransactionFormValues) {
+    setIsSaving(true);
     try {
       if (editingTransaction) {
         await updateTransaction(editingTransaction.id, {
-          amount: numAmount,
-          description: description || null,
-          date,
-          categoryId,
+          amount: values.amount,
+          description: values.description || null,
+          date: values.date,
+          categoryId: values.categoryId,
         });
       } else {
         await createTransaction({
-          amount: numAmount,
-          description: description || null,
-          date,
-          categoryId,
+          amount: values.amount,
+          description: values.description || null,
+          date: values.date,
+          categoryId: values.categoryId,
         });
       }
       handleCloseModal();
       await refreshCachedPages(currentPage);
     } catch {
-      setError("Failed to save transaction");
+      setError("root", { message: "Failed to save transaction" });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -174,13 +183,19 @@ export default function TransactionsPage() {
         <h1 className="text-primary text-3xl font-semibold tracking-tight">
           Transactions
         </h1>
-        <button
-          type="button"
-          onClick={handleOpenAddModal}
-          className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
-        >
-          Add Transaction
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            disabled={categories.length === 0}
+            className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Add Transaction
+          </button>
+          {categories.length === 0 && (
+            <p className="text-sm text-tertiary">Add a category first</p>
+          )}
+        </div>
       </div>
 
       <div className="mt-8">
@@ -191,6 +206,7 @@ export default function TransactionsPage() {
           transactions={displayData}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
+          deletingId={deletingId}
         />
         <Pagination
           currentPage={currentPage}
@@ -204,7 +220,7 @@ export default function TransactionsPage() {
         onClose={handleCloseModal}
         title={editingTransaction ? "Edit Transaction" : "Add Transaction"}
       >
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit(handleSave)} className="space-y-4">
           <div>
             <label
               htmlFor="amount"
@@ -216,12 +232,16 @@ export default function TransactionsPage() {
               id="amount"
               type="number"
               step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              {...register("amount")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
               placeholder="0.00"
               autoFocus
             />
+            {errors.amount && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.amount.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -234,10 +254,12 @@ export default function TransactionsPage() {
             <input
               id="date"
               type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              {...register("date")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
             />
+            {errors.date && (
+              <p className="mt-1 text-sm text-red-600">{errors.date.message}</p>
+            )}
           </div>
 
           <div>
@@ -249,8 +271,7 @@ export default function TransactionsPage() {
             </label>
             <select
               id="category"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
+              {...register("categoryId")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
             >
               <option value="" disabled>
@@ -262,6 +283,11 @@ export default function TransactionsPage() {
                 </option>
               ))}
             </select>
+            {errors.categoryId && (
+              <p className="mt-1 text-sm text-red-600">
+                {errors.categoryId.message}
+              </p>
+            )}
           </div>
 
           <div>
@@ -274,14 +300,15 @@ export default function TransactionsPage() {
             <input
               id="description"
               type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...register("description")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
               placeholder="Optional"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {errors.root && (
+            <p className="text-sm text-red-600">{errors.root.message}</p>
+          )}
 
           <div className="flex justify-end gap-2">
             <button
@@ -292,14 +319,14 @@ export default function TransactionsPage() {
               Cancel
             </button>
             <button
-              type="button"
-              onClick={handleSave}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
+              type="submit"
+              disabled={isSaving}
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {editingTransaction ? "Save" : "Add"}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

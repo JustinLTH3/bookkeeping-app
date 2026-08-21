@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -10,9 +12,10 @@ import {
   renameCategory,
   deleteCategory,
 } from "@/actions/categories";
+import type { Category } from "@/actions/categories";
+import { CategorySchema } from "@/lib/schemas";
 
-export type Category = {
-  id: string;
+type CategoryFormValues = {
   name: string;
 };
 
@@ -26,9 +29,21 @@ export default function CategoriesPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    clearErrors,
+    formState: { errors },
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(CategorySchema),
+    defaultValues: { name: "" },
+  });
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const displayData = pageCache[currentPage] ?? [];
@@ -72,15 +87,15 @@ export default function CategoriesPage() {
 
   function handleOpenAddModal() {
     setEditingCategory(null);
-    setName("");
-    setError("");
+    reset({ name: "" });
+    clearErrors();
     setIsModalOpen(true);
   }
 
   function handleOpenEditModal(category: Category) {
     setEditingCategory(category);
-    setName(category.name);
-    setError("");
+    reset({ name: category.name });
+    clearErrors();
     setIsModalOpen(true);
   }
 
@@ -91,6 +106,7 @@ export default function CategoriesPage() {
 
   async function handleDelete(id: string) {
     setDeleteError("");
+    setDeletingId(id);
     try {
       await deleteCategory(id);
       const preDeleteData = pageCache[currentPage] ?? [];
@@ -103,29 +119,28 @@ export default function CategoriesPage() {
       }
     } catch {
       setDeleteError("Failed to delete category");
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  async function handleSave() {
-    setError("");
-    if (!name.trim()) {
-      setError("Category name is required");
-      return;
-    }
-
+  async function handleSave(values: CategoryFormValues) {
+    setIsSaving(true);
     try {
       if (editingCategory) {
         await renameCategory({
           id: editingCategory.id,
-          name: name.trim(),
+          name: values.name,
         });
       } else {
-        await createCategory({ name: name.trim() });
+        await createCategory({ name: values.name });
       }
       handleCloseModal();
       await refreshCachedPages(currentPage);
     } catch {
-      setError("Failed to save category");
+      setError("root", { message: "Failed to save category" });
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -152,6 +167,7 @@ export default function CategoriesPage() {
           categories={displayData}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
+          deletingId={deletingId}
         />
         <Pagination
           currentPage={currentPage}
@@ -165,7 +181,7 @@ export default function CategoriesPage() {
         onClose={handleCloseModal}
         title={editingCategory ? "Edit Category" : "Add Category"}
       >
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit(handleSave)} className="space-y-4">
           <div>
             <label
               htmlFor="name"
@@ -176,14 +192,18 @@ export default function CategoriesPage() {
             <input
               id="name"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...register("name")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
               placeholder="Category name"
               autoFocus
             />
-            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            )}
           </div>
+          {errors.root && (
+            <p className="text-sm text-red-600">{errors.root.message}</p>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -193,14 +213,14 @@ export default function CategoriesPage() {
               Cancel
             </button>
             <button
-              type="button"
-              onClick={handleSave}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
+              type="submit"
+              disabled={isSaving}
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

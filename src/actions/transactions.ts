@@ -4,9 +4,9 @@ import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import dayjs from "dayjs";
-import { z } from "zod";
+import { TransactionSchema } from "@/lib/schemas";
 
-export type TransactionResponse = {
+export type Transaction = {
   id: string;
   amount: number;
   description: string | null;
@@ -15,22 +15,10 @@ export type TransactionResponse = {
   category: { id: string; name: string };
 };
 
-const TransactionInput = z.object({
-  amount: z.preprocess(
-    (v) => (typeof v === "number" && (isNaN(v) || v === 0) ? 0 : v),
-    z.number().refine((v) => v !== 0, {
-      message: "Amount must be a non-zero number",
-    }),
-  ),
-  description: z.string().nullable(),
-  date: z.string().min(1, "Date is required"),
-  categoryId: z.string().min(1, "Category is required"),
-});
-
 export async function getTransactions(
   offset = 0,
   limit = 10,
-): Promise<{ transactions: TransactionResponse[]; totalCount: number }> {
+): Promise<{ transactions: Transaction[]; totalCount: number }> {
   const userId = await requireUserId();
 
   const where = { userId };
@@ -76,10 +64,10 @@ export async function createTransaction(data: {
   description: string | null;
   date: string;
   categoryId: string;
-}): Promise<TransactionResponse> {
+}): Promise<Transaction> {
   const userId = await requireUserId();
 
-  const parsed = TransactionInput.safeParse(data);
+  const parsed = TransactionSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const { amount, description, date, categoryId } = parsed.data;
@@ -120,7 +108,7 @@ export async function updateTransaction(
 ): Promise<void> {
   const userId = await requireUserId();
 
-  const parsed = TransactionInput.safeParse(data);
+  const parsed = TransactionSchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const { amount, description, date, categoryId } = parsed.data;

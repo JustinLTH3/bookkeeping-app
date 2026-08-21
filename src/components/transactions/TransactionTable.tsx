@@ -1,4 +1,4 @@
-import type { Transaction } from "@/app/(app)/transactions/page";
+import type { Transaction } from "@/actions/transactions";
 import dayjs from "dayjs";
 import { formatCurrency } from "@/lib/currency";
 
@@ -8,9 +8,15 @@ type Props = {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
+  deletingId: string | null;
 };
 
-export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
+export function TransactionTable({
+  transactions,
+  onEdit,
+  onDelete,
+  deletingId,
+}: Props) {
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - transactions.length);
 
   return (
@@ -45,7 +51,7 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                   {dayjs(transaction.date).format("MMM D, YYYY")}
                 </td>
                 <td className="px-6 py-4 text-primary text-sm wrap-break-word">
-                  {transaction.description || "—"}
+                  {transaction.description ?? "—"}
                 </td>
                 <td className="px-6 py-4 text-primary text-sm">
                   {transaction.category.name}
@@ -69,7 +75,8 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                     <button
                       type="button"
                       onClick={() => onDelete(transaction.id)}
-                      className="rounded-md px-3 py-1.5 font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                      disabled={deletingId === transaction.id}
+                      className="rounded-md px-3 py-1.5 font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Delete
                     </button>

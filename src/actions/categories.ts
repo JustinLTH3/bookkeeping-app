@@ -3,17 +3,12 @@
 import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
+import { CategorySchema } from "@/lib/schemas";
 
-const nonEmptyTrimmed = z
-  .string()
-  .transform((s) => s.trim())
-  .pipe(z.string().min(1, "Category name is required"));
-
-const CategoryInput = z.object({
-  id: z.string().optional(),
-  name: nonEmptyTrimmed,
-});
+export type Category = {
+  id: string;
+  name: string;
+};
 
 function revalidateCategoryPaths() {
   revalidatePath("/categories");
@@ -24,7 +19,7 @@ export async function getCategories(
   offset?: number,
   limit?: number,
 ): Promise<{
-  categories: { id: string; name: string }[];
+  categories: Category[];
   totalCount: number;
 }> {
   const userId = await requireUserId();
@@ -60,7 +55,7 @@ export async function getCategories(
 export async function createCategory(data: { name: string }) {
   const userId = await requireUserId();
 
-  const parsed = CategoryInput.safeParse(data);
+  const parsed = CategorySchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const category = await prisma.category.create({
@@ -87,7 +82,7 @@ export async function deleteCategory(id: string) {
 export async function renameCategory(data: { id: string; name: string }) {
   const userId = await requireUserId();
 
-  const parsed = CategoryInput.safeParse(data);
+  const parsed = CategorySchema.safeParse(data);
   if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const category = await prisma.category.update({
