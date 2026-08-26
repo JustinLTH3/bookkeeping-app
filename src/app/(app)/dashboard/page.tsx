@@ -6,7 +6,7 @@ import dayjs from "dayjs";
 import { PieChart } from "@/components/charts/PieChart";
 import { LineChart } from "@/components/charts/LineChart";
 import { getDashboardData } from "@/actions/dashboard";
-import type { DashboardData } from "@/actions/dashboard";
+import type { DashboardData, TimeRange } from "@/actions/dashboard";
 import { formatCurrency } from "@/lib/currency";
 
 const TIME_RANGES = [
@@ -15,14 +15,12 @@ const TIME_RANGES = [
   { value: "quarterly", label: "Quarterly" },
   { value: "yearly", label: "Yearly" },
   { value: "ytd", label: "Year to Date" },
-] as const;
+] satisfies readonly { value: TimeRange; label: string }[];
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<
-    "weekly" | "monthly" | "quarterly" | "yearly" | "ytd"
-  >("monthly");
+  const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
 
   useEffect(() => {
     async function load() {
@@ -56,8 +54,7 @@ export default function DashboardPage() {
           value={timeRange}
           onChange={(e) =>
             setTimeRange(
-              e.target.value as
-                "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+              e.target.value as TimeRange,
             )
           }
           className="rounded-md border border-primary/10 px-3 py-1.5 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"

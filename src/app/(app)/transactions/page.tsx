@@ -16,6 +16,7 @@ import {
 import type { Transaction } from "@/actions/transactions";
 import { getCategories } from "@/actions/categories";
 import type { Category } from "@/actions/categories";
+import { usePaginatedCache } from "@/hooks/usePaginatedCache";
 import { TransactionSchema } from "@/lib/schemas";
 import dayjs from "dayjs";
 
@@ -30,9 +31,21 @@ const ITEMS_PER_PAGE = 10;
 const CACHE_WINDOW = 2;
 
 export default function TransactionsPage() {
-  const [pageCache, setPageCache] = useState<Record<number, Transaction[]>>({});
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const {
+    data,
+    totalPages,
+    currentPage,
+    goToPage,
+    refresh,
+    loading,
+  } = usePaginatedCache<Transaction>({
+    fetcher: async (offset, limit) => {
+      const result = await getTransactions(offset, limit);
+      return { data: result.transactions, totalCount: result.totalCount };
+    },
+    pageSize: ITEMS_PER_PAGE,
+    cacheWindow: CACHE_WINDOW,
+  });
   const [categories, setCategories] = useState<Category[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,42 +72,8 @@ export default function TransactionsPage() {
     },
   });
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
-  const displayData = pageCache[currentPage] ?? [];
-
-  async function refreshCachedPages(centerPage: number) {
-    const min = Math.max(1, centerPage - CACHE_WINDOW);
-    const max = centerPage + CACHE_WINDOW;
-
-    const offset = (min - 1) * ITEMS_PER_PAGE;
-    const count = (max - min + 1) * ITEMS_PER_PAGE;
-
-    const { transactions, totalCount } = await getTransactions(offset, count);
-
-    const newCache: Record<number, Transaction[]> = {};
-    let page = min;
-    for (let start = 0; start < transactions.length; start += ITEMS_PER_PAGE) {
-      newCache[page++] = transactions.slice(
-        start,
-        Math.min(start + ITEMS_PER_PAGE, transactions.length),
-      );
-    }
-
-    setPageCache(newCache);
-    setTotalCount(totalCount);
-  }
-
-  async function goToPage(page: number) {
-    if (page < 1 || page > totalPages) return;
-    if (!pageCache[page]) {
-      await refreshCachedPages(page);
-    }
-    setCurrentPage(page);
-  }
-
   useEffect(() => {
     async function load() {
-      await refreshCachedPages(1);
       const { categories } = await getCategories();
       setCategories(categories);
     }
@@ -135,14 +114,9 @@ export default function TransactionsPage() {
     setDeletingId(id);
     try {
       await deleteTransaction(id);
-      const preDeleteData = pageCache[currentPage] ?? [];
-      if (preDeleteData.length === 1 && currentPage > 1) {
-        const targetPage = currentPage - 1;
-        setCurrentPage(targetPage);
-        await refreshCachedPages(targetPage);
-      } else {
-        await refreshCachedPages(currentPage);
-      }
+      const targetPage =
+        data.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      await goToPage(targetPage, { forceRefresh: true });
     } catch {
       setDeleteError("Failed to delete transaction");
     } finally {
@@ -169,12 +143,20 @@ export default function TransactionsPage() {
         });
       }
       handleCloseModal();
-      await refreshCachedPages(currentPage);
+      await refresh();
     } catch {
       setError("root", { message: "Failed to save transaction" });
     } finally {
       setIsSaving(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-5xl px-8 py-10">
+        <p className="text-sm text-tertiary">Loading transactions...</p>
+      </div>
+    );
   }
 
   return (
@@ -203,7 +185,7 @@ export default function TransactionsPage() {
           <p className="mb-4 text-sm text-red-600">{deleteError}</p>
         )}
         <TransactionTable
-          transactions={displayData}
+          transactions={data}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
           deletingId={deletingId}

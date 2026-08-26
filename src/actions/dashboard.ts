@@ -1,6 +1,8 @@
 "use server";
 
 import { requireUserId } from "@/lib/auth";
+
+export type TimeRange = "weekly" | "monthly" | "quarterly" | "yearly" | "ytd";
 import { prisma } from "@/lib/prisma";
 import {
   dashboardSummary as dashboardSummarySql,
@@ -65,7 +67,7 @@ function toUtcMidnight(d: dayjs.Dayjs): Date {
 }
 
 function getEndDate(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ) {
   const now = dayjs();
   switch (timeRange) {
@@ -84,7 +86,7 @@ function getEndDate(
 
 async function _getDashboardSummary(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<SummaryData> {
   const now = dayjs();
   const weekStart = toUtcMidnight(now.startOf("isoWeek"));
@@ -104,14 +106,14 @@ async function _getDashboardSummary(
 }
 
 export async function getDashboardSummary(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<SummaryData> {
   const userId = await requireUserId();
   return _getDashboardSummary(userId, timeRange);
 }
 
 function getStartDate(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ) {
   const now = dayjs();
   switch (timeRange) {
@@ -129,7 +131,7 @@ function getStartDate(
 
 async function _getExpensesByCategory(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CategoryExpense[]> {
   const startDate = toUtcMidnight(getStartDate(timeRange));
 
@@ -141,7 +143,7 @@ async function _getExpensesByCategory(
 }
 
 export async function getExpensesByCategory(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<CategoryExpense[]> {
   const userId = await requireUserId();
   return _getExpensesByCategory(userId, timeRange);
@@ -149,7 +151,7 @@ export async function getExpensesByCategory(
 
 async function _getCashFlow(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CashFlowPoint[]> {
   const startDate = toUtcMidnight(getStartDate(timeRange));
 
@@ -175,7 +177,7 @@ async function _getCashFlow(
 }
 
 export async function getCashFlow(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CashFlowPoint[]> {
   const userId = await requireUserId();
   return _getCashFlow(userId, timeRange);
@@ -219,7 +221,7 @@ export type DashboardData = {
 };
 
 export async function getDashboardData(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<DashboardData> {
   const userId = await requireUserId();
 
