@@ -20,23 +20,23 @@ export function TransactionTable({
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - transactions.length);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-primary/10 bg-white">
-      <table className="w-full table-fixed">
+    <div className="overflow-x-auto rounded-lg border border-primary/10 bg-white">
+      <table className="w-[1000px] table-fixed">
         <thead>
           <tr className="bg-primary text-white">
-            <th className="w-[12%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[120px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Date
             </th>
-            <th className="w-[28%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[280px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Description
             </th>
-            <th className="w-[18%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[180px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Category
             </th>
-            <th className="w-[22%] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+            <th className="w-[220px] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
               Amount
             </th>
-            <th className="w-[20%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[200px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Actions
             </th>
           </tr>

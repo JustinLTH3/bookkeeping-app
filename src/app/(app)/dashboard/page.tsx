@@ -69,20 +69,20 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <SummaryCard title="This Week">
+        <SummaryCard title={data?.summary.periodLabel ?? "Monthly"}>
           <div className="space-y-2">
             {data?.summary && (
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Income</span>
                   <span className="text-sm font-medium text-secondary">
-                    {formatCurrency(data.summary.weekIncome)}
+                    {formatCurrency(data.summary.periodIncome)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-tertiary">Expense</span>
                   <span className="text-sm font-medium text-red-600">
-                    {formatCurrency(data.summary.weekExpense)}
+                    {formatCurrency(data.summary.periodExpense)}
                   </span>
                 </div>
               </>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
           </div>
         </SummaryCard>
 
-        <SummaryCard title="Net Balance">
+        <SummaryCard title="All-time Net Balance">
           {data?.summary && (
             <p
               className={`text-2xl font-semibold tabular-nums ${
@@ -168,19 +168,19 @@ export default function DashboardPage() {
           </Link>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
+          <table className="w-[1000px] table-fixed">
             <thead>
               <tr className="bg-primary text-white">
-                <th className="w-[20%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="w-[200px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Date
                 </th>
-                <th className="w-[35%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="w-[350px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Description
                 </th>
-                <th className="w-[25%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                <th className="w-[250px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Category
                 </th>
-                <th className="w-[20%] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                <th className="w-[200px] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                   Amount
                 </th>
               </tr>

@@ -56,8 +56,8 @@ describe("getDashboardSummary", () => {
     mockQueryRawTyped.mockResolvedValue([
       {
         net_balance: "295.00",
-        week_income: "100.00",
-        week_expense: "-30.00",
+        period_income: "100.00",
+        period_expense: "-30.00",
         period_net_flow: "295.00",
       },
     ]);
@@ -65,8 +65,8 @@ describe("getDashboardSummary", () => {
     const result = await getDashboardSummary();
 
     expect(result).toEqual({
-      weekIncome: 100,
-      weekExpense: -30,
+      periodIncome: 100,
+      periodExpense: -30,
       netBalance: 295,
       periodNetFlow: 295,
       periodLabel: "Monthly",
@@ -75,7 +75,6 @@ describe("getDashboardSummary", () => {
     expect(mockQueryRawTyped).toHaveBeenCalledOnce();
     expect(mockSqlFns.dashboardSummary).toHaveBeenCalledWith(
       "user-1",
-      new Date(`${dayjs().startOf("isoWeek").format("YYYY-MM-DD")}T00:00:00.000Z`),
       new Date(`${dayjs().startOf("month").format("YYYY-MM-DD")}T00:00:00.000Z`),
     );
   });
@@ -92,8 +91,8 @@ describe("getDashboardSummary", () => {
     mockQueryRawTyped.mockResolvedValue([
       {
         net_balance: "0",
-        week_income: "0",
-        week_expense: "0",
+        period_income: "0",
+        period_expense: "0",
         period_net_flow: "0",
       },
     ]);
@@ -101,8 +100,8 @@ describe("getDashboardSummary", () => {
     const result = await getDashboardSummary();
 
     expect(result).toEqual({
-      weekIncome: 0,
-      weekExpense: 0,
+      periodIncome: 0,
+      periodExpense: 0,
       netBalance: 0,
       periodNetFlow: 0,
       periodLabel: "Monthly",

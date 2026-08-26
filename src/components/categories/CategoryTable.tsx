@@ -18,14 +18,14 @@ export function CategoryTable({
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - categories.length);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-primary/10 bg-white">
-      <table className="w-full table-fixed">
+    <div className="overflow-x-auto rounded-lg border border-primary/10 bg-white">
+      <table className="w-[600px] table-fixed">
         <thead>
           <tr className="bg-primary text-white">
-            <th className="w-[80%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[480px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Name
             </th>
-            <th className="w-[20%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[120px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Actions
             </th>
           </tr>

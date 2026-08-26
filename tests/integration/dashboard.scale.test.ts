@@ -35,8 +35,8 @@ const D = Prisma.Decimal;
 
 type Oracle = {
   netBalance: Prisma.Decimal;
-  weekIncome: Prisma.Decimal;
-  weekExpense: Prisma.Decimal;
+  periodIncome: Prisma.Decimal;
+  periodExpense: Prisma.Decimal;
   expensesByCategory: Record<string, Prisma.Decimal>;
 };
 
@@ -77,13 +77,12 @@ beforeAll(async () => {
 
   const monthStart = dayjs().startOf("month");
   const monthEnd = dayjs().endOf("month");
-  const weekStartMs = dayjs().startOf("isoWeek").toDate().getTime();
   const frozenNow = dayjs().toDate();
 
   oracle = {
     netBalance: new D(0),
-    weekIncome: new D(0),
-    weekExpense: new D(0),
+    periodIncome: new D(0),
+    periodExpense: new D(0),
     expensesByCategory: {},
   };
 
@@ -107,10 +106,8 @@ beforeAll(async () => {
         i % 7 === 0 ? faker.commerce.productName() : undefined;
 
       oracle.netBalance = oracle.netBalance.plus(amount);
-      if (date.getTime() >= weekStartMs) {
-        if (amount > 0) oracle.weekIncome = oracle.weekIncome.plus(amount);
-        if (amount < 0) oracle.weekExpense = oracle.weekExpense.plus(amount);
-      }
+      if (amount > 0) oracle.periodIncome = oracle.periodIncome.plus(amount);
+      if (amount < 0) oracle.periodExpense = oracle.periodExpense.plus(amount);
       if (amount < 0) {
         oracle.expensesByCategory[catName] = (
           oracle.expensesByCategory[catName] ?? new D(0)
@@ -151,8 +148,8 @@ describe("dashboard at scale", () => {
       expectDec(result.netBalance, oracle.netBalance);
       // Every seeded row is inside the current month
       expectDec(result.periodNetFlow, oracle.netBalance);
-      expectDec(result.weekIncome, oracle.weekIncome);
-      expectDec(result.weekExpense, oracle.weekExpense);
+      expectDec(result.periodIncome, oracle.periodIncome);
+      expectDec(result.periodExpense, oracle.periodExpense);
       expect(elapsed).toBeLessThan(TIME_CEILING_MS);
     },
   );

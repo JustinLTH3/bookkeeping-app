@@ -16,8 +16,8 @@ import isoWeek from "dayjs/plugin/isoWeek";
 dayjs.extend(isoWeek);
 
 export type SummaryData = {
-  weekIncome: number;
-  weekExpense: number;
+  periodIncome: number;
+  periodExpense: number;
   netBalance: number;
   periodNetFlow: number;
   periodLabel: string;
@@ -88,17 +88,15 @@ async function _getDashboardSummary(
   userId: string,
   timeRange: TimeRange,
 ): Promise<SummaryData> {
-  const now = dayjs();
-  const weekStart = toUtcMidnight(now.startOf("isoWeek"));
   const periodStart = toUtcMidnight(getStartDate(timeRange));
 
   const [row] = await prisma.$queryRawTyped(
-    dashboardSummarySql(userId, weekStart, periodStart),
+    dashboardSummarySql(userId, periodStart),
   );
 
   return {
-    weekIncome: Number(row.week_income),
-    weekExpense: Number(row.week_expense),
+    periodIncome: Number(row.period_income),
+    periodExpense: Number(row.period_expense),
     netBalance: Number(row.net_balance),
     periodNetFlow: Number(row.period_net_flow),
     periodLabel: PERIOD_LABELS[timeRange],

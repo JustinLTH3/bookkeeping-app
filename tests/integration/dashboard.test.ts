@@ -57,28 +57,28 @@ afterAll(async () => {
 });
 
 describe("getDashboardSummary", () => {
-  it("aggregates week totals and net balance from real rows", async () => {
+  it("aggregates period income/expense and net balance from real rows", async () => {
     const user = await createUser(faker.internet.email());
     const food = await createCategory(user.id, "Food");
     const salary = await createCategory(user.id, "Salary");
 
-    const weekStart = dayjs().startOf("isoWeek");
-    // Inside this week
+    const monthStart = dayjs().startOf("month");
+    // Inside this month
     await createTransaction(user.id, salary.id, 1000, dayjs().toDate());
-    await createTransaction(user.id, food.id, -50.25, weekStart.toDate());
-    // Before this week: excluded from week totals, still in net balance
+    await createTransaction(user.id, food.id, -50.25, monthStart.toDate());
+    // Before this month: excluded from period totals, still in net balance
     await createTransaction(
       user.id,
       food.id,
       -200,
-      weekStart.subtract(1, "day").toDate(),
+      monthStart.subtract(1, "day").toDate(),
     );
 
     asUser(user.id);
     const result = await getDashboardSummary("monthly");
 
-    expectDec(result.weekIncome, 1000);
-    expectDec(result.weekExpense, -50.25);
+    expectDec(result.periodIncome, 1000);
+    expectDec(result.periodExpense, -50.25);
     expectDec(result.netBalance, 749.75);
     expect(result.periodLabel).toBe("Monthly");
   });
@@ -130,8 +130,8 @@ describe("getDashboardSummary", () => {
     const result = await getDashboardSummary("monthly");
 
     expect(result).toEqual({
-      weekIncome: 0,
-      weekExpense: 0,
+      periodIncome: 0,
+      periodExpense: 0,
       netBalance: 0,
       periodNetFlow: 0,
       periodLabel: "Monthly",
@@ -151,7 +151,7 @@ describe("getDashboardSummary", () => {
     const result = await getDashboardSummary("weekly");
 
     expectDec(result.netBalance, 10000000000);
-    expectDec(result.weekIncome, 10000000000);
+    expectDec(result.periodIncome, 10000000000);
   });
 });
 
@@ -395,8 +395,8 @@ describe("multi-tenancy", () => {
 
     const summary = await getDashboardSummary("monthly");
     expectDec(summary.netBalance, -40);
-    expectDec(summary.weekExpense, -40);
-    expectDec(summary.weekIncome, 0);
+    expectDec(summary.periodExpense, -40);
+    expectDec(summary.periodIncome, 0);
 
     const expenses = await getExpensesByCategory("monthly");
     expect(expenses).toEqual([{ categoryName: "Food", total: -40 }]);
