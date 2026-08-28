@@ -33,6 +33,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
       - run: npx prisma generate --sql
         env:
           DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
