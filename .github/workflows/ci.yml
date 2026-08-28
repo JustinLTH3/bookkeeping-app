@@ -33,7 +33,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx prisma generate
+      - run: npx prisma generate --sql
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
