@@ -14,10 +14,10 @@ import {
   faker,
 } from "./helpers";
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockRequireUserId } = vi.hoisted(() => ({ mockRequireUserId: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 vi.mock("next/cache", () => ({
@@ -99,7 +99,7 @@ beforeAll(async () => {
     await prisma.transaction.createMany({ data: batch });
   }
 
-  mockAuth.mockResolvedValue({ user: { id: userId } });
+  mockRequireUserId.mockResolvedValue(userId);
 
   const updateTxn = await createTransaction({
     amount: -42.42,
@@ -264,7 +264,7 @@ describe("transactions at scale", () => {
     { timeout: 30_000 },
     async () => {
       const userB = await createUser(faker.internet.email());
-      mockAuth.mockResolvedValue({ user: { id: userB.id } });
+      mockRequireUserId.mockResolvedValue(userB.id);
 
       await expect(
         updateTransaction(knownUpdateId, {
@@ -275,7 +275,7 @@ describe("transactions at scale", () => {
         }),
       ).rejects.toThrow();
 
-      mockAuth.mockResolvedValue({ user: { id: userId } });
+      mockRequireUserId.mockResolvedValue(userId);
     },
   );
 
@@ -306,7 +306,7 @@ describe("transactions at scale", () => {
       expect(transactions.length).toBeGreaterThan(0);
       const someId = transactions[0].id;
 
-      mockAuth.mockResolvedValue({ user: { id: userC.id } });
+      mockRequireUserId.mockResolvedValue(userC.id);
       await expect(deleteTransaction(someId)).rejects.toThrow();
 
       const stillHere = await prisma.transaction.findUnique({
@@ -314,7 +314,7 @@ describe("transactions at scale", () => {
       });
       expect(stillHere).toBeTruthy();
 
-      mockAuth.mockResolvedValue({ user: { id: userId } });
+      mockRequireUserId.mockResolvedValue(userId);
     },
   );
 
@@ -323,13 +323,13 @@ describe("transactions at scale", () => {
     { timeout: 30_000 },
     async () => {
       const userD = await createUser(faker.internet.email());
-      mockAuth.mockResolvedValue({ user: { id: userD.id } });
+      mockRequireUserId.mockResolvedValue(userD.id);
 
       const { transactions, totalCount: count } = await getTransactions(0, 10);
       expect(transactions).toHaveLength(0);
       expect(count).toBe(0);
 
-      mockAuth.mockResolvedValue({ user: { id: userId } });
+      mockRequireUserId.mockResolvedValue(userId);
     },
   );
 });

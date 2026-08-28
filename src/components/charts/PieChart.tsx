@@ -1,34 +1,39 @@
 "use client";
 
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartData } from "chart.js";
 import { Pie } from "react-chartjs-2";
+import { formatCurrency } from "@/lib/currency";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const CHART_COLORS = [
-  "#10b981",
-  "#3b82f6",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#ec4899",
-  "#14b8a6",
-  "#f97316",
-  "#6366f1",
-  "#84cc16",
-];
+const GOLDEN_ANGLE = 137.508;
+
+function stringHash(str: string) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
+function categoryColor(name: string) {
+  const hue = (stringHash(name) * GOLDEN_ANGLE) % 360;
+  return `hsl(${hue}, 65%, 55%)`;
+}
 
 type Props = {
   data: { categoryName: string; total: number }[];
 };
 
 export function PieChart({ data }: Props) {
-  const chartData = {
+  const total = data.reduce((s, d) => s + Math.abs(d.total), 0);
+
+  const chartData: ChartData<"pie", number[], string> = {
     labels: data.map((d) => d.categoryName),
     datasets: [
       {
         data: data.map((d) => Math.abs(d.total)),
-        backgroundColor: CHART_COLORS.slice(0, data.length),
+        backgroundColor: data.map((d) => categoryColor(d.categoryName)),
         borderWidth: 0,
       },
     ],
@@ -36,7 +41,7 @@ export function PieChart({ data }: Props) {
 
   return (
     <div className="flex justify-center">
-      <div className="w-full max-w-sm">
+      <div className="aspect-square w-full max-w-sm">
         <Pie
           data={chartData}
           options={{
@@ -52,14 +57,10 @@ export function PieChart({ data }: Props) {
               tooltip: {
                 callbacks: {
                   label: (ctx) => {
-                    const value = ctx.parsed as number;
-                    const total = (ctx.dataset.data as number[]).reduce(
-                      (s, v) => s + v,
-                      0,
-                    );
+                    const value = ctx.parsed;
                     const pct =
                       total > 0 ? ((value / total) * 100).toFixed(1) : "0.0";
-                    return ` $${value.toFixed(2)} (${pct}%)`;
+                    return ` ${formatCurrency(value)} (${pct}%)`;
                   },
                 },
               },

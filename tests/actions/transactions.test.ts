@@ -7,16 +7,18 @@ import {
 } from "@/actions/transactions";
 
 const {
-  mockAuth,
+  mockRequireUserId,
   mockFindMany,
+  mockFindFirst,
   mockCreate,
   mockUpdate,
   mockDelete,
   mockCount,
   mockRevalidatePath,
 } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+  mockRequireUserId: vi.fn(),
   mockFindMany: vi.fn(),
+  mockFindFirst: vi.fn(),
   mockCreate: vi.fn(),
   mockUpdate: vi.fn(),
   mockDelete: vi.fn(),
@@ -25,11 +27,14 @@ const {
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    category: {
+      findFirst: mockFindFirst,
+    },
     transaction: {
       findMany: mockFindMany,
       create: mockCreate,
@@ -71,7 +76,7 @@ describe("getTransactions", () => {
       },
     ];
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue(transactions);
     mockCount.mockResolvedValue(15);
 
@@ -100,7 +105,7 @@ describe("getTransactions", () => {
     });
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { id: "desc" }],
       skip: 0,
       take: 10,
       include: { category: { select: { id: true, name: true } } },
@@ -111,7 +116,7 @@ describe("getTransactions", () => {
   });
 
   it("defaults to offset 0 limit 10", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
@@ -123,14 +128,14 @@ describe("getTransactions", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getTransactions()).rejects.toThrow("Unauthorized");
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
   it("returns empty array when user has no transactions", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
     mockCount.mockResolvedValue(0);
 
@@ -142,7 +147,7 @@ describe("getTransactions", () => {
   it("maps Prisma Decimal amount to number and formats date to YYYY-MM-DD", async () => {
     const prismaDecimal = { valueOf: () => 42.5 };
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([
       {
         id: "txn-1",
@@ -182,7 +187,8 @@ describe("createTransaction", () => {
       category: { id: "cat-1", name: "Food" },
     };
 
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-1", name: "Food" });
     mockCreate.mockResolvedValue(created);
 
     const result = await createTransaction(validData);
@@ -210,14 +216,14 @@ describe("createTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(createTransaction(validData)).rejects.toThrow("Unauthorized");
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
   it("throws Amount must be a non-zero number when amount is 0", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       createTransaction({ ...validData, amount: 0 }),
@@ -226,7 +232,7 @@ describe("createTransaction", () => {
   });
 
   it("throws Amount must be a non-zero number when amount is NaN", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       createTransaction({ ...validData, amount: NaN }),
@@ -235,7 +241,7 @@ describe("createTransaction", () => {
   });
 
   it("throws Date is required when date is empty", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(createTransaction({ ...validData, date: "" })).rejects.toThrow(
       "Date is required",
@@ -244,7 +250,7 @@ describe("createTransaction", () => {
   });
 
   it("throws Category is required when categoryId is empty", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       createTransaction({ ...validData, categoryId: "" }),
@@ -252,9 +258,20 @@ describe("createTransaction", () => {
     expect(mockCreate).not.toHaveBeenCalled();
   });
 
+  it("throws Category not found when category does not belong to user", async () => {
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue(null);
+
+    await expect(
+      createTransaction({ ...validData, categoryId: "cat-other-user" }),
+    ).rejects.toThrow("Category not found");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("propagates Prisma errors", async () => {
     const error = new Error("Unique constraint failed");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-1", name: "Food" });
     mockCreate.mockRejectedValue(error);
 
     await expect(createTransaction(validData)).rejects.toThrow(
@@ -274,7 +291,8 @@ describe("updateTransaction", () => {
   };
 
   it("updates a transaction for authenticated user", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-2", name: "Transport" });
     mockUpdate.mockResolvedValue({});
 
     await updateTransaction(txnId, validData);
@@ -293,7 +311,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(updateTransaction(txnId, validData)).rejects.toThrow(
       "Unauthorized",
@@ -302,7 +320,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Amount must be a non-zero number when amount is 0", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       updateTransaction(txnId, { ...validData, amount: 0 }),
@@ -311,7 +329,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Amount must be a non-zero number when amount is NaN", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       updateTransaction(txnId, { ...validData, amount: NaN }),
@@ -320,7 +338,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Date is required when date is empty", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       updateTransaction(txnId, { ...validData, date: "" }),
@@ -329,7 +347,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Category is required when categoryId is empty", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(
       updateTransaction(txnId, { ...validData, categoryId: "" }),
@@ -337,9 +355,20 @@ describe("updateTransaction", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
+  it("throws Category not found when category does not belong to user", async () => {
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue(null);
+
+    await expect(
+      updateTransaction(txnId, { ...validData, categoryId: "cat-other-user" }),
+    ).rejects.toThrow("Category not found");
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("propagates Prisma errors (record not found)", async () => {
     const error = new Error("Record to update does not exist");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
+    mockFindFirst.mockResolvedValue({ id: "cat-2", name: "Transport" });
     mockUpdate.mockRejectedValue(error);
 
     await expect(updateTransaction(txnId, validData)).rejects.toThrow(
@@ -351,7 +380,7 @@ describe("updateTransaction", () => {
 
 describe("deleteTransaction", () => {
   it("deletes a transaction for authenticated user", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockDelete.mockResolvedValue({});
 
     await deleteTransaction("txn-1");
@@ -364,7 +393,7 @@ describe("deleteTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(deleteTransaction("txn-1")).rejects.toThrow("Unauthorized");
     expect(mockDelete).not.toHaveBeenCalled();
@@ -372,7 +401,7 @@ describe("deleteTransaction", () => {
 
   it("propagates Prisma errors (record not found)", async () => {
     const error = new Error("Record to delete does not exist");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockDelete.mockRejectedValue(error);
 
     await expect(deleteTransaction("nonexistent-id")).rejects.toThrow(

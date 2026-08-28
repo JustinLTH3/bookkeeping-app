@@ -23,10 +23,10 @@ import {
   faker,
 } from "./helpers";
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockRequireUserId } = vi.hoisted(() => ({ mockRequireUserId: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 vi.mock("next/cache", () => ({
@@ -34,14 +34,14 @@ vi.mock("next/cache", () => ({
 }));
 
 function asUser(id: string) {
-  mockAuth.mockResolvedValue({ user: { id } });
+  mockRequireUserId.mockResolvedValue(id);
 }
 
 beforeEach(async () => {
   faker.seed(123);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date());
-  mockAuth.mockReset();
+  mockRequireUserId.mockReset();
   await truncateAll();
 });
 
@@ -141,7 +141,7 @@ describe("createTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(
       createTransaction({
@@ -345,7 +345,7 @@ describe("getTransactions", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getTransactions()).rejects.toThrow("Unauthorized");
   });
@@ -456,7 +456,7 @@ describe("updateTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(
       updateTransaction("any-id", {
@@ -581,7 +581,7 @@ describe("deleteTransaction", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(deleteTransaction("any-id")).rejects.toThrow("Unauthorized");
   });
@@ -643,9 +643,9 @@ describe("foreign key constraints", () => {
       "Food",
     );
 
-    mockAuth.mockResolvedValue({
-      user: { id: "00000000-0000-0000-0000-000000000000" },
-    });
+    mockRequireUserId.mockResolvedValue(
+      "00000000-0000-0000-0000-000000000000",
+    );
 
     await expect(
       createTransaction({

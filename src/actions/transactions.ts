@@ -1,11 +1,12 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import dayjs from "dayjs";
+import { TransactionSchema } from "@/lib/schemas";
 
-export type TransactionResponse = {
+export type Transaction = {
   id: string;
   amount: number;
   description: string | null;
@@ -17,17 +18,16 @@ export type TransactionResponse = {
 export async function getTransactions(
   offset = 0,
   limit = 10,
-): Promise<{ transactions: TransactionResponse[]; totalCount: number }> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+): Promise<{ transactions: Transaction[]; totalCount: number }> {
+  const userId = await requireUserId();
 
-  const where = { userId: session.user.id };
+  const where = { userId };
   const skip = offset;
 
   const [rows, totalCount] = await Promise.all([
     prisma.transaction.findMany({
       where,
-      orderBy: { date: "desc" },
+      orderBy: [{ date: "desc" }, { id: "desc" }],
       skip,
       take: limit,
       include: { category: { select: { id: true, name: true } } },
@@ -47,38 +47,45 @@ export async function getTransactions(
   return { transactions, totalCount };
 }
 
+function revalidateTransactionPaths() {
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+}
+
+async function validateCategoryOwnership(categoryId: string, userId: string) {
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, userId },
+  });
+  if (!category) throw new Error("Category not found");
+}
+
 export async function createTransaction(data: {
   amount: number;
   description: string | null;
   date: string;
   categoryId: string;
-}): Promise<TransactionResponse> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+}): Promise<Transaction> {
+  const userId = await requireUserId();
 
-  if (!data.amount || isNaN(data.amount) || data.amount === 0) {
-    throw new Error("Amount must be a non-zero number");
-  }
-  if (!data.date) {
-    throw new Error("Date is required");
-  }
-  if (!data.categoryId) {
-    throw new Error("Category is required");
-  }
+  const parsed = TransactionSchema.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const { amount, description, date, categoryId } = parsed.data;
+
+  await validateCategoryOwnership(categoryId, userId);
 
   const transaction = await prisma.transaction.create({
     data: {
-      amount: data.amount,
-      description: data.description,
-      date: dayjs(data.date).toDate(),
-      userId: session.user.id,
-      categoryId: data.categoryId,
+      amount,
+      description,
+      date: new Date(`${date}T00:00:00.000Z`),
+      userId,
+      categoryId,
     },
     include: { category: { select: { id: true, name: true } } },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 
   return {
     id: transaction.id,
@@ -99,41 +106,34 @@ export async function updateTransaction(
     categoryId: string;
   },
 ): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  if (!data.amount || isNaN(data.amount) || data.amount === 0) {
-    throw new Error("Amount must be a non-zero number");
-  }
-  if (!data.date) {
-    throw new Error("Date is required");
-  }
-  if (!data.categoryId) {
-    throw new Error("Category is required");
-  }
+  const parsed = TransactionSchema.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+
+  const { amount, description, date, categoryId } = parsed.data;
+
+  await validateCategoryOwnership(categoryId, userId);
 
   await prisma.transaction.update({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     data: {
-      amount: data.amount,
-      description: data.description,
-      date: dayjs(data.date).toDate(),
-      categoryId: data.categoryId,
+      amount,
+      description,
+      date: new Date(`${date}T00:00:00.000Z`),
+      categoryId,
     },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
   await prisma.transaction.delete({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
   });
 
-  revalidatePath("/transactions");
-  revalidatePath("/dashboard");
+  revalidateTransactionPaths();
 }

@@ -1,7 +1,14 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
+
+export type TimeRange = "weekly" | "monthly" | "quarterly" | "yearly" | "ytd";
 import { prisma } from "@/lib/prisma";
+import {
+  dashboardSummary as dashboardSummarySql,
+  expensesByCategory as expensesByCategorySql,
+  cashFlowByDay as cashFlowByDaySql,
+} from "@/generated/prisma/sql";
 import { Prisma } from "@/generated/prisma/client";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -9,8 +16,8 @@ import isoWeek from "dayjs/plugin/isoWeek";
 dayjs.extend(isoWeek);
 
 export type SummaryData = {
-  weekIncome: number;
-  weekExpense: number;
+  periodIncome: number;
+  periodExpense: number;
   netBalance: number;
   periodNetFlow: number;
   periodLabel: string;
@@ -52,8 +59,15 @@ function endOfQuarter(d: dayjs.Dayjs) {
   return d.month(q * 3 + 2).endOf("month");
 }
 
+/** Convert a local-calendar day into the UTC-midnight Date the DATE column
+ *  expects: the driver serializes Dates via UTC components, so a local
+ *  midnight would store the previous day. */
+function toUtcMidnight(d: dayjs.Dayjs): Date {
+  return new Date(`${d.format("YYYY-MM-DD")}T00:00:00.000Z`);
+}
+
 function getEndDate(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ) {
   const now = dayjs();
   switch (timeRange) {
@@ -72,34 +86,17 @@ function getEndDate(
 
 async function _getDashboardSummary(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<SummaryData> {
-  const now = dayjs();
-  const weekStart = now.startOf("isoWeek").toDate();
-  const periodStart = getStartDate(timeRange).toDate();
+  const periodStart = toUtcMidnight(getStartDate(timeRange));
 
-  const rows = await prisma.$queryRaw<
-    Array<{
-      net_balance: string;
-      week_income: string;
-      week_expense: string;
-      period_net_flow: string;
-    }>
-  >`
-    SELECT
-      COALESCE(SUM(amount), 0) AS net_balance,
-      COALESCE(SUM(amount) FILTER (WHERE date >= ${weekStart} AND amount > 0), 0) AS week_income,
-      COALESCE(SUM(amount) FILTER (WHERE date >= ${weekStart} AND amount < 0), 0) AS week_expense,
-      COALESCE(SUM(amount) FILTER (WHERE date >= ${periodStart}), 0) AS period_net_flow
-    FROM "Transaction"
-    WHERE "userId" = ${userId}
-  `;
-
-  const row = rows[0];
+  const [row] = await prisma.$queryRawTyped(
+    dashboardSummarySql(userId, periodStart),
+  );
 
   return {
-    weekIncome: Number(row.week_income),
-    weekExpense: Number(row.week_expense),
+    periodIncome: Number(row.period_income),
+    periodExpense: Number(row.period_expense),
     netBalance: Number(row.net_balance),
     periodNetFlow: Number(row.period_net_flow),
     periodLabel: PERIOD_LABELS[timeRange],
@@ -107,15 +104,14 @@ async function _getDashboardSummary(
 }
 
 export async function getDashboardSummary(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<SummaryData> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getDashboardSummary(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getDashboardSummary(userId, timeRange);
 }
 
 function getStartDate(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ) {
   const now = dayjs();
   switch (timeRange) {
@@ -133,66 +129,44 @@ function getStartDate(
 
 async function _getExpensesByCategory(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CategoryExpense[]> {
-  const startDate = getStartDate(timeRange).toDate();
+  const startDate = toUtcMidnight(getStartDate(timeRange));
 
-  const expenses = await prisma.transaction.findMany({
-    where: {
-      userId,
-      date: { gte: startDate },
-      amount: { lt: 0 },
-    },
-    select: { amount: true, category: { select: { name: true } } },
-  });
+  const rows = await prisma.$queryRawTyped(
+    expensesByCategorySql(userId, startDate),
+  );
 
-  const grouped: Record<string, Prisma.Decimal> = {};
-  for (const e of expenses) {
-    const name = e.category.name;
-    grouped[name] = (grouped[name] || new Prisma.Decimal(0)).plus(e.amount);
-  }
-
-  return Object.entries(grouped)
-    .map(([categoryName, total]) => ({ categoryName, total: total.toNumber() }))
-    .sort((a, b) => a.total - b.total);
+  return rows.map((r) => ({ categoryName: r.name, total: Number(r.total) }));
 }
 
 export async function getExpensesByCategory(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<CategoryExpense[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getExpensesByCategory(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getExpensesByCategory(userId, timeRange);
 }
 
 async function _getCashFlow(
   userId: string,
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CashFlowPoint[]> {
-  const startDate = getStartDate(timeRange);
+  const startDate = toUtcMidnight(getStartDate(timeRange));
 
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      userId,
-      date: { gte: startDate.toDate() },
-    },
-    orderBy: { date: "asc" },
-    select: { amount: true, date: true },
-  });
+  const rows = await prisma.$queryRawTyped(cashFlowByDaySql(userId, startDate));
 
-  const dailyMap: Record<string, Prisma.Decimal> = {};
-  for (const t of transactions) {
-    const key = dayjs(t.date).format("YYYY-MM-DD");
-    dailyMap[key] = (dailyMap[key] || new Prisma.Decimal(0)).plus(t.amount);
+  const dailyMap: Record<string, number> = {};
+  for (const r of rows) {
+    dailyMap[dayjs(r.day).format("YYYY-MM-DD")] = Number(r.total);
   }
 
   let cumulative = new Prisma.Decimal(0);
   const result: CashFlowPoint[] = [];
-  let cursor = startDate.clone();
+  let cursor = dayjs(startDate);
   const endDate = getEndDate(timeRange);
   while (cursor.isBefore(endDate.add(1, "day"))) {
     const key = cursor.format("YYYY-MM-DD");
-    cumulative = cumulative.plus(dailyMap[key] || new Prisma.Decimal(0));
+    cumulative = cumulative.plus(dailyMap[key] ?? 0);
     result.push({ date: key, balance: cumulative.toNumber() });
     cursor = cursor.add(1, "day");
   }
@@ -201,11 +175,10 @@ async function _getCashFlow(
 }
 
 export async function getCashFlow(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd",
+  timeRange: TimeRange,
 ): Promise<CashFlowPoint[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getCashFlow(session.user.id, timeRange);
+  const userId = await requireUserId();
+  return _getCashFlow(userId, timeRange);
 }
 
 async function _getRecentTransactions(
@@ -213,7 +186,7 @@ async function _getRecentTransactions(
 ): Promise<RecentTransaction[]> {
   const transactions = await prisma.transaction.findMany({
     where: { userId },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "desc" }],
     take: 5,
     select: {
       id: true,
@@ -234,9 +207,8 @@ async function _getRecentTransactions(
 }
 
 export async function getRecentTransactions(): Promise<RecentTransaction[]> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-  return _getRecentTransactions(session.user.id);
+  const userId = await requireUserId();
+  return _getRecentTransactions(userId);
 }
 
 export type DashboardData = {
@@ -247,12 +219,9 @@ export type DashboardData = {
 };
 
 export async function getDashboardData(
-  timeRange: "weekly" | "monthly" | "quarterly" | "yearly" | "ytd" = "monthly",
+  timeRange: TimeRange = "monthly",
 ): Promise<DashboardData> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
-  const userId = session.user.id;
+  const userId = await requireUserId();
 
   const [summary, expensesByCategory, cashFlow, recentTransactions] =
     await Promise.all([

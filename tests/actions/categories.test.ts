@@ -7,7 +7,7 @@ import {
 } from "@/actions/categories";
 
 const {
-  mockAuth,
+  mockRequireUserId,
   mockFindMany,
   mockCreate,
   mockDelete,
@@ -15,7 +15,7 @@ const {
   mockCount,
   mockRevalidatePath,
 } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
+  mockRequireUserId: vi.fn(),
   mockFindMany: vi.fn(),
   mockCreate: vi.fn(),
   mockDelete: vi.fn(),
@@ -25,7 +25,7 @@ const {
 }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -54,7 +54,7 @@ describe("getCategories", () => {
       { id: "cat-1", name: "Food" },
       { id: "cat-2", name: "Transport" },
     ];
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue(categories);
 
     const result = await getCategories();
@@ -65,7 +65,7 @@ describe("getCategories", () => {
     });
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       select: { id: true, name: true },
     });
     expect(mockCount).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe("getCategories", () => {
       { id: "cat-1", name: "Food" },
       { id: "cat-2", name: "Transport" },
     ];
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue(categories);
     mockCount.mockResolvedValue(25);
 
@@ -88,7 +88,7 @@ describe("getCategories", () => {
     });
     expect(mockFindMany).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: 0,
       take: 10,
       select: { id: true, name: true },
@@ -99,14 +99,14 @@ describe("getCategories", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(getCategories()).rejects.toThrow("Unauthorized");
     expect(mockFindMany).not.toHaveBeenCalled();
   });
 
   it("returns empty categories array when user has no categories", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockFindMany.mockResolvedValue([]);
 
     const result = await getCategories();
@@ -118,7 +118,7 @@ describe("getCategories", () => {
 describe("createCategory", () => {
   it("creates and returns a category with trimmed name", async () => {
     const category = { id: "cat-1", name: "Food" };
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockCreate.mockResolvedValue(category);
 
     const result = await createCategory({ name: "Food" });
@@ -133,7 +133,7 @@ describe("createCategory", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(createCategory({ name: "Food" })).rejects.toThrow(
       "Unauthorized",
@@ -142,7 +142,7 @@ describe("createCategory", () => {
   });
 
   it("throws Category name is required for empty string", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(createCategory({ name: "" })).rejects.toThrow(
       "Category name is required",
@@ -151,7 +151,7 @@ describe("createCategory", () => {
   });
 
   it("throws Category name is required for whitespace-only name", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(createCategory({ name: "   " })).rejects.toThrow(
       "Category name is required",
@@ -160,7 +160,7 @@ describe("createCategory", () => {
   });
 
   it("trims whitespace from name", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockCreate.mockResolvedValue({ id: "cat-1", name: "Groceries" });
 
     await createCategory({ name: "  Groceries  " });
@@ -174,7 +174,7 @@ describe("createCategory", () => {
 
   it("propagates Prisma errors (e.g., unique constraint violation)", async () => {
     const error = new Error("Unique constraint failed");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockCreate.mockRejectedValue(error);
 
     await expect(createCategory({ name: "Food" })).rejects.toThrow(
@@ -186,7 +186,7 @@ describe("createCategory", () => {
 describe("deleteCategory", () => {
   it("deletes and returns the category", async () => {
     const category = { id: "cat-1", name: "Food" };
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockDelete.mockResolvedValue(category);
 
     const result = await deleteCategory("cat-1");
@@ -201,7 +201,7 @@ describe("deleteCategory", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(deleteCategory("cat-1")).rejects.toThrow("Unauthorized");
     expect(mockDelete).not.toHaveBeenCalled();
@@ -209,7 +209,7 @@ describe("deleteCategory", () => {
 
   it("propagates Prisma errors (e.g., linked transactions)", async () => {
     const error = new Error("Foreign key constraint violation");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockDelete.mockRejectedValue(error);
 
     await expect(deleteCategory("cat-1")).rejects.toThrow(
@@ -219,7 +219,7 @@ describe("deleteCategory", () => {
 
   it("throws RecordNotFound when category does not exist", async () => {
     const error = new Error("Record to delete does not exist");
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockDelete.mockRejectedValue(error);
 
     await expect(deleteCategory("nonexistent-id")).rejects.toThrow(
@@ -231,7 +231,7 @@ describe("deleteCategory", () => {
 describe("renameCategory", () => {
   it("renames and returns the category with trimmed name", async () => {
     const category = { id: "cat-1", name: "Bills" };
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockUpdate.mockResolvedValue(category);
 
     const result = await renameCategory({ id: "cat-1", name: "Bills" });
@@ -247,7 +247,7 @@ describe("renameCategory", () => {
   });
 
   it("throws Unauthorized when no session", async () => {
-    mockAuth.mockResolvedValue(null);
+    mockRequireUserId.mockRejectedValue(new Error("Unauthorized"));
 
     await expect(
       renameCategory({ id: "cat-1", name: "Bills" }),
@@ -256,7 +256,7 @@ describe("renameCategory", () => {
   });
 
   it("throws Category name is required for empty string", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(renameCategory({ id: "cat-1", name: "" })).rejects.toThrow(
       "Category name is required",
@@ -265,7 +265,7 @@ describe("renameCategory", () => {
   });
 
   it("throws Category name is required for whitespace-only name", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
 
     await expect(renameCategory({ id: "cat-1", name: "   " })).rejects.toThrow(
       "Category name is required",
@@ -274,7 +274,7 @@ describe("renameCategory", () => {
   });
 
   it("trims whitespace from name", async () => {
-    mockAuth.mockResolvedValue({ user: { id: "user-1" } });
+    mockRequireUserId.mockResolvedValue("user-1");
     mockUpdate.mockResolvedValue({ id: "cat-1", name: "Bills" });
 
     await renameCategory({ id: "cat-1", name: "  Bills  " });

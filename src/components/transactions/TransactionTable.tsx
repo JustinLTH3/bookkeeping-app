@@ -1,5 +1,6 @@
-import type { Transaction } from "@/app/(app)/transactions/page";
+import type { Transaction } from "@/actions/transactions";
 import dayjs from "dayjs";
+import { formatCurrency } from "@/lib/currency";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -7,29 +8,35 @@ type Props = {
   transactions: Transaction[];
   onEdit: (transaction: Transaction) => void;
   onDelete: (id: string) => void;
+  deletingId: string | null;
 };
 
-export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
+export function TransactionTable({
+  transactions,
+  onEdit,
+  onDelete,
+  deletingId,
+}: Props) {
   const emptyRows = Math.max(0, ITEMS_PER_PAGE - transactions.length);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-primary/10 bg-white">
-      <table className="w-full table-fixed">
+    <div className="overflow-x-auto rounded-lg border border-primary/10 bg-white">
+      <table className="w-[1000px] table-fixed">
         <thead>
           <tr className="bg-primary text-white">
-            <th className="w-[12%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[120px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Date
             </th>
-            <th className="w-[28%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[280px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Description
             </th>
-            <th className="w-[18%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[180px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Category
             </th>
-            <th className="w-[22%] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+            <th className="w-[220px] px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
               Amount
             </th>
-            <th className="w-[20%] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            <th className="w-[200px] px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
               Actions
             </th>
           </tr>
@@ -37,10 +44,6 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
         <tbody className="divide-y divide-neutral">
           {transactions.map((transaction) => {
             const isIncome = transaction.amount >= 0;
-            const formatted = new Intl.NumberFormat("en-US", {
-              style: "currency",
-              currency: "USD",
-            }).format(Math.abs(transaction.amount));
 
             return (
               <tr key={transaction.id} className="hover:bg-neutral/50">
@@ -48,7 +51,7 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                   {dayjs(transaction.date).format("MMM D, YYYY")}
                 </td>
                 <td className="px-6 py-4 text-primary text-sm wrap-break-word">
-                  {transaction.description || "—"}
+                  {transaction.description ?? "—"}
                 </td>
                 <td className="px-6 py-4 text-primary text-sm">
                   {transaction.category.name}
@@ -58,8 +61,7 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                     isIncome ? "text-secondary" : "text-red-600"
                   }`}
                 >
-                  {isIncome ? "+" : "-"}
-                  {formatted}
+                  {formatCurrency(transaction.amount)}
                 </td>
                 <td className="px-6 py-4 text-sm">
                   <div className="flex flex-row items-center gap-1">
@@ -73,7 +75,8 @@ export function TransactionTable({ transactions, onEdit, onDelete }: Props) {
                     <button
                       type="button"
                       onClick={() => onDelete(transaction.id)}
-                      className="rounded-md px-3 py-1.5 font-medium bg-red-50 text-red-600 hover:bg-red-100"
+                      disabled={deletingId === transaction.id}
+                      className="rounded-md px-3 py-1.5 font-medium bg-red-50 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Delete
                     </button>

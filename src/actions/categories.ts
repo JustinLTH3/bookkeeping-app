@@ -1,20 +1,30 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { CategorySchema } from "@/lib/schemas";
+
+export type Category = {
+  id: string;
+  name: string;
+};
+
+function revalidateCategoryPaths() {
+  revalidatePath("/categories");
+  revalidatePath("/transactions");
+}
 
 export async function getCategories(
   offset?: number,
   limit?: number,
 ): Promise<{
-  categories: { id: string; name: string }[];
+  categories: Category[];
   totalCount: number;
 }> {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  const where = { userId: session.user.id };
+  const where = { userId };
 
   if (offset !== undefined && limit !== undefined) {
     const skip = offset;
@@ -22,7 +32,7 @@ export async function getCategories(
     const [categories, totalCount] = await Promise.all([
       prisma.category.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         skip,
         take: limit,
         select: { id: true, name: true },
@@ -35,7 +45,7 @@ export async function getCategories(
 
   const categories = await prisma.category.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     select: { id: true, name: true },
   });
 
@@ -43,50 +53,44 @@ export async function getCategories(
 }
 
 export async function createCategory(data: { name: string }) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  const name = data.name.trim();
-  if (!name) throw new Error("Category name is required");
+  const parsed = CategorySchema.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const category = await prisma.category.create({
-    data: { name, userId: session.user.id },
+    data: { name: parsed.data.name, userId },
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }
 
 export async function deleteCategory(id: string) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
   const category = await prisma.category.delete({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }
 
 export async function renameCategory(data: { id: string; name: string }) {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = await requireUserId();
 
-  const name = data.name.trim();
-  if (!name) throw new Error("Category name is required");
+  const parsed = CategorySchema.safeParse(data);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
 
   const category = await prisma.category.update({
-    where: { id: data.id, userId: session.user.id },
-    data: { name },
+    where: { id: parsed.data.id ?? data.id, userId },
+    data: { name: parsed.data.name },
     select: { id: true, name: true },
   });
 
-  revalidatePath("/categories");
-  revalidatePath("/transactions");
+  revalidateCategoryPaths();
   return category;
 }

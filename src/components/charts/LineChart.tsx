@@ -8,9 +8,12 @@ import {
   LineElement,
   Filler,
   Tooltip,
+  ChartData,
+  ChartOptions,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import dayjs from "dayjs";
+import { formatCurrency } from "@/lib/currency";
 
 ChartJS.register(
   CategoryScale,
@@ -32,13 +35,13 @@ type Props = {
 
 export function LineChart({ data }: Props) {
   const todayStr = dayjs().format("YYYY-MM-DD");
-  let futureIndex = data.findIndex((p) => p.date == todayStr);
+  let futureIndex = data.findIndex((p) => p.date === todayStr);
   if (futureIndex < 0) futureIndex = data.length;
 
   const labels = data.map((d) => dayjs(d.date).format("MMM D"));
   const values = data.map((d) => d.balance);
 
-  const chartData = {
+  const chartData: ChartData<"line"> = {
     labels,
     datasets: [
       {
@@ -50,53 +53,48 @@ export function LineChart({ data }: Props) {
         pointRadius: 0,
         borderWidth: 2,
         segment: {
-          borderColor: (ctx: { p1DataIndex: number }) =>
+          borderColor: (ctx) =>
             ctx.p1DataIndex > futureIndex ? "#d1d5db" : "#10b981",
-          backgroundColor: (ctx: { p1DataIndex: number }) =>
+          backgroundColor: (ctx) =>
             ctx.p1DataIndex > futureIndex
               ? "rgba(209, 213, 219, 0.15)"
               : "rgba(16, 185, 129, 0.1)",
-          borderDash: (ctx: { p1DataIndex: number }) =>
-            ctx.p1DataIndex > futureIndex ? [4, 4] : [],
+          borderDash: (ctx) => (ctx.p1DataIndex > futureIndex ? [4, 4] : []),
         },
       },
     ],
   };
+  const chartOptions: ChartOptions<"line"> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            const value = ctx.parsed.y as number;
+            return ` ${formatCurrency(value)}`;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          maxTicksLimit: 8,
+          font: { size: 11 },
+        },
+        grid: { display: false },
+      },
+      y: {
+        ticks: {
+          font: { size: 11 },
+          callback: (val) => formatCurrency(Number(val)),
+        },
+        grid: { color: "rgba(0,0,0,0.06)" },
+      },
+    },
+  };
 
-  return (
-    <Line
-      data={chartData}
-      options={{
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const value = ctx.parsed.y as number;
-                return ` $${value.toFixed(2)}`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            ticks: {
-              maxTicksLimit: 8,
-              font: { size: 11 },
-            },
-            grid: { display: false },
-          },
-          y: {
-            ticks: {
-              font: { size: 11 },
-              callback: (val) => `$${val}`,
-            },
-            grid: { color: "rgba(0,0,0,0.06)" },
-          },
-        },
-      }}
-    />
-  );
+  return <Line data={chartData} options={chartOptions} />;
 }

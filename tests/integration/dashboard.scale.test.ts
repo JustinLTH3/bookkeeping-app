@@ -19,10 +19,10 @@ import {
 
 dayjs.extend(isoWeek);
 
-const { mockAuth } = vi.hoisted(() => ({ mockAuth: vi.fn() }));
+const { mockRequireUserId } = vi.hoisted(() => ({ mockRequireUserId: vi.fn() }));
 
 vi.mock("@/lib/auth", () => ({
-  auth: mockAuth,
+  requireUserId: mockRequireUserId,
 }));
 
 const SCALE_ROWS = Number(process.env.SCALE_ROWS ?? 50_000);
@@ -35,8 +35,8 @@ const D = Prisma.Decimal;
 
 type Oracle = {
   netBalance: Prisma.Decimal;
-  weekIncome: Prisma.Decimal;
-  weekExpense: Prisma.Decimal;
+  periodIncome: Prisma.Decimal;
+  periodExpense: Prisma.Decimal;
   expensesByCategory: Record<string, Prisma.Decimal>;
 };
 
@@ -77,13 +77,12 @@ beforeAll(async () => {
 
   const monthStart = dayjs().startOf("month");
   const monthEnd = dayjs().endOf("month");
-  const weekStartMs = dayjs().startOf("isoWeek").toDate().getTime();
   const frozenNow = dayjs().toDate();
 
   oracle = {
     netBalance: new D(0),
-    weekIncome: new D(0),
-    weekExpense: new D(0),
+    periodIncome: new D(0),
+    periodExpense: new D(0),
     expensesByCategory: {},
   };
 
@@ -102,14 +101,13 @@ beforeAll(async () => {
         from: monthStart.toDate(),
         to: monthEnd.toDate(),
       });
+      const dateOnly = dayjs(date).format("YYYY-MM-DD");
       const description =
         i % 7 === 0 ? faker.commerce.productName() : undefined;
 
       oracle.netBalance = oracle.netBalance.plus(amount);
-      if (date.getTime() >= weekStartMs) {
-        if (amount > 0) oracle.weekIncome = oracle.weekIncome.plus(amount);
-        if (amount < 0) oracle.weekExpense = oracle.weekExpense.plus(amount);
-      }
+      if (amount > 0) oracle.periodIncome = oracle.periodIncome.plus(amount);
+      if (amount < 0) oracle.periodExpense = oracle.periodExpense.plus(amount);
       if (amount < 0) {
         oracle.expensesByCategory[catName] = (
           oracle.expensesByCategory[catName] ?? new D(0)
@@ -120,7 +118,7 @@ beforeAll(async () => {
         userId,
         categoryId: categoryIds[catIdx],
         amount,
-        date,
+        date: new Date(`${dateOnly}T00:00:00.000Z`),
         description,
         createdAt: frozenNow,
         updatedAt: frozenNow,
@@ -129,7 +127,7 @@ beforeAll(async () => {
     await prisma.transaction.createMany({ data: batch });
   }
 
-  mockAuth.mockResolvedValue({ user: { id: userId } });
+  mockRequireUserId.mockResolvedValue(userId);
 }, 60_000);
 
 afterAll(async () => {
@@ -150,8 +148,8 @@ describe("dashboard at scale", () => {
       expectDec(result.netBalance, oracle.netBalance);
       // Every seeded row is inside the current month
       expectDec(result.periodNetFlow, oracle.netBalance);
-      expectDec(result.weekIncome, oracle.weekIncome);
-      expectDec(result.weekExpense, oracle.weekExpense);
+      expectDec(result.periodIncome, oracle.periodIncome);
+      expectDec(result.periodExpense, oracle.periodExpense);
       expect(elapsed).toBeLessThan(TIME_CEILING_MS);
     },
   );
@@ -207,7 +205,7 @@ describe("dashboard at scale", () => {
         },
       });
 
-      mockAuth.mockResolvedValue({ user: { id: userB.id } });
+      mockRequireUserId.mockResolvedValue(userB.id);
 
       const summary = await getDashboardSummary("monthly");
       expect(summary.netBalance).toBe(-7);
@@ -216,7 +214,7 @@ describe("dashboard at scale", () => {
       expect(recent).toHaveLength(1);
       expect(recent[0].description).toBe("B lunch");
 
-      mockAuth.mockResolvedValue({ user: { id: userId } });
+      mockRequireUserId.mockResolvedValue(userId);
     },
   );
 });

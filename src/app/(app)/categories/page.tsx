@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CategoryTable } from "@/components/categories/CategoryTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { Modal } from "@/components/ui/Modal";
@@ -10,9 +12,11 @@ import {
   renameCategory,
   deleteCategory,
 } from "@/actions/categories";
+import type { Category } from "@/actions/categories";
+import { usePaginatedCache } from "@/hooks/usePaginatedCache";
+import { CategorySchema } from "@/lib/schemas";
 
-export type Category = {
-  id: string;
+type CategoryFormValues = {
   name: string;
 };
 
@@ -20,67 +24,45 @@ const ITEMS_PER_PAGE = 10;
 const CACHE_WINDOW = 2;
 
 export default function CategoriesPage() {
-  const [pageCache, setPageCache] = useState<Record<number, Category[]>>({});
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const { data, totalPages, currentPage, goToPage, refresh, loading } =
+    usePaginatedCache<Category>({
+      fetcher: async (offset, limit) => {
+        const result = await getCategories(offset, limit);
+        return { data: result.categories, totalCount: result.totalCount };
+      },
+      pageSize: ITEMS_PER_PAGE,
+      cacheWindow: CACHE_WINDOW,
+    });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
-  const displayData = pageCache[currentPage] ?? [];
-
-  async function refreshCachedPages(centerPage: number) {
-    const min = Math.max(1, centerPage - CACHE_WINDOW);
-    const max = centerPage + CACHE_WINDOW;
-
-    const offset = (min - 1) * ITEMS_PER_PAGE;
-    const count = (max - min + 1) * ITEMS_PER_PAGE;
-
-    const { categories, totalCount } = await getCategories(offset, count);
-
-    const newCache: Record<number, Category[]> = {};
-    let page = min;
-    for (let start = 0; start < categories.length; start += ITEMS_PER_PAGE) {
-      newCache[page++] = categories.slice(
-        start,
-        Math.min(start + ITEMS_PER_PAGE, categories.length),
-      );
-    }
-
-    setPageCache(newCache);
-    setTotalCount(totalCount);
-  }
-
-  async function goToPage(page: number) {
-    if (page < 1 || page > totalPages) return;
-    if (!pageCache[page]) {
-      await refreshCachedPages(page);
-    }
-    setCurrentPage(page);
-  }
-
-  useEffect(() => {
-    async function load() {
-      await refreshCachedPages(1);
-    }
-    load();
-  }, []);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setError,
+    clearErrors,
+    formState: { errors },
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(CategorySchema),
+    defaultValues: { name: "" },
+  });
 
   function handleOpenAddModal() {
     setEditingCategory(null);
-    setName("");
-    setError("");
+    reset({ name: "" });
+    clearErrors();
     setIsModalOpen(true);
   }
 
   function handleOpenEditModal(category: Category) {
     setEditingCategory(category);
-    setName(category.name);
-    setError("");
+    reset({ name: category.name });
+    clearErrors();
     setIsModalOpen(true);
   }
 
@@ -91,42 +73,45 @@ export default function CategoriesPage() {
 
   async function handleDelete(id: string) {
     setDeleteError("");
+    setDeletingId(id);
     try {
       await deleteCategory(id);
-      const preDeleteData = pageCache[currentPage] ?? [];
-      if (preDeleteData.length === 1 && currentPage > 1) {
-        const targetPage = currentPage - 1;
-        setCurrentPage(targetPage);
-        await refreshCachedPages(targetPage);
-      } else {
-        await refreshCachedPages(currentPage);
-      }
+      const targetPage =
+        data.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      await goToPage(targetPage, { forceRefresh: true });
     } catch {
       setDeleteError("Failed to delete category");
+    } finally {
+      setDeletingId(null);
     }
   }
 
-  async function handleSave() {
-    setError("");
-    if (!name.trim()) {
-      setError("Category name is required");
-      return;
-    }
-
+  async function handleSave(values: CategoryFormValues) {
+    setIsSaving(true);
     try {
       if (editingCategory) {
         await renameCategory({
           id: editingCategory.id,
-          name: name.trim(),
+          name: values.name,
         });
       } else {
-        await createCategory({ name: name.trim() });
+        await createCategory({ name: values.name });
       }
       handleCloseModal();
-      await refreshCachedPages(currentPage);
+      await refresh();
     } catch {
-      setError("Failed to save category");
+      setError("root", { message: "Failed to save category" });
+    } finally {
+      setIsSaving(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-5xl px-8 py-10">
+        <p className="text-sm text-tertiary">Loading categories...</p>
+      </div>
+    );
   }
 
   return (
@@ -149,9 +134,10 @@ export default function CategoriesPage() {
           <p className="mb-4 text-sm text-red-600">{deleteError}</p>
         )}
         <CategoryTable
-          categories={displayData}
+          categories={data}
           onEdit={handleOpenEditModal}
           onDelete={handleDelete}
+          deletingId={deletingId}
         />
         <Pagination
           currentPage={currentPage}
@@ -165,7 +151,7 @@ export default function CategoriesPage() {
         onClose={handleCloseModal}
         title={editingCategory ? "Edit Category" : "Add Category"}
       >
-        <div className="space-y-4">
+        <form onSubmit={handleSubmit(handleSave)} className="space-y-4">
           <div>
             <label
               htmlFor="name"
@@ -176,14 +162,18 @@ export default function CategoriesPage() {
             <input
               id="name"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...register("name")}
               className="w-full rounded-md border border-primary/10 px-3 py-2 text-sm text-primary outline-none focus:border-secondary focus:ring-1 focus:ring-secondary"
               placeholder="Category name"
               autoFocus
             />
-            {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+            )}
           </div>
+          {errors.root && (
+            <p className="text-sm text-red-600">{errors.root.message}</p>
+          )}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -193,14 +183,14 @@ export default function CategoriesPage() {
               Cancel
             </button>
             <button
-              type="button"
-              onClick={handleSave}
-              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90"
+              type="submit"
+              disabled={isSaving}
+              className="rounded-md bg-secondary px-4 py-2 text-sm font-medium text-white hover:bg-secondary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Save
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );
