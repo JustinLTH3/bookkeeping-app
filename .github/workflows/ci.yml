@@ -26,6 +26,8 @@ jobs:
           --health-retries 5
     env:
       TEST_DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
+      DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
+      DATABASE_URL_UNPOOLED: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,11 +36,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
       - run: npx prisma generate --sql
-        env:
-          DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
@@ -46,6 +44,5 @@ jobs:
           AUTH_SECRET: dummy-secret-for-ci
           AUTH_GOOGLE_ID: dummy
           AUTH_GOOGLE_SECRET: dummy
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
       - run: npm test
       - run: npm run test:integration
