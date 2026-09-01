@@ -37,9 +37,6 @@ jobs:
       - run: npm ci
       - run: npx prisma migrate deploy
       - run: npx prisma generate --sql
-        env:
-          DATABASE_URL: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
-          DATABASE_URL_UNPOOLED: postgresql://bookkeeping:bookkeeping@localhost:5432/bookkeeping_test
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run build
@@ -47,7 +44,5 @@ jobs:
           AUTH_SECRET: dummy-secret-for-ci
           AUTH_GOOGLE_ID: dummy
           AUTH_GOOGLE_SECRET: dummy
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-          DATABASE_URL_UNPOOLED: postgresql://dummy:dummy@localhost:5432/dummy
       - run: npm test
       - run: npm run test:integration
